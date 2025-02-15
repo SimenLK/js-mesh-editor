@@ -1,22 +1,46 @@
-<html>
+<!doctype html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width" />
   <title>Mesh editor</title>
 
   <link rel="stylesheet" href="style.css"/>
+
+  <script id="vertex-shader" type="x-shader/x-vertex">
+    attribute vec4 a_vertexPosition;
+
+    uniform mat4 u_modelViewMatrix;
+    uniform mat4 u_projectionMatrix;
+
+    void main()
+    {
+      gl_Position = u_projectionMatrix * u_modelViewMatrix * a_vertexPosition;
+    }
+  </script>
+
+  <script id="fragment-shader" type="x-shader/x-fragment">
+    void main()
+    {
+      gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+    }
+  </script>
+
+  <script src="index.js" type="module"></script>
 </head>
 
 <body>
 <main>
   <div class="sidebar">
     <h1>Mesh editor</h1>
-    <p>hei, på deg</p>
+    <p>Hello there. This is a test. We're testing whether this paragraph will wrap properly.</p>
+    <p>The purpose of this app is to test whether we can create a WebGL mesh editor. How will it be to interact with the mesh, modifying it with mouse-dragging, node deletion, and subsequent re-uploading of the mesh to the GPU.</p>
   </div>
 
   <canvas id="mesh-editor"></canvas>
 </main>
 
-<script src="index.js"></script>
 </body>
 </html>
 
-<!-- vim: set et ts=2 sw=2  -->
+<!-- vim: ai et ts=2 sw=2:  -->

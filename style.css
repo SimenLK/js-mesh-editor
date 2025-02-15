@@ -7,7 +7,9 @@ canvas {
 }
 
 .sidebar {
+  flex-basis: 200px;
   padding: 20px;
   border-right: 1px black solid;
 }
 
+/* vim: set et ts=2 sw=2 */
