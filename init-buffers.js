@@ -7,6 +7,7 @@ function init_position_buffer(gl) {
   const positions = [
     1.0, 1.0,
     -1.0, 1.0,
+    1.0, -1.0,
     -1.0, -1.0,
   ];
 

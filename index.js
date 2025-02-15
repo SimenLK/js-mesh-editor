@@ -58,6 +58,8 @@ function main() {
   const vertex_shader_elem = document.getElementById("vertex-shader");
   const fragment_shader_elem = document.getElementById("fragment-shader");
 
+  console.log("Vertex shader:\n%s", vertex_shader_elem.innerText);
+
   const shader_program = init_shader_program(gl, vertex_shader_elem.innerText, fragment_shader_elem.innerText);
 
   const program_info = {
@@ -67,14 +69,15 @@ function main() {
     },
     uniform_locations: {
       projection_matrix: gl.getUniformLocation(shader_program, "u_projectionMatrix"),
-      model_view__matrix: gl.getUniformLocation(shader_program, "u_modelViewMatrix"),
+      model_view_matrix: gl.getUniformLocation(shader_program, "u_modelViewMatrix"),
     },
   };
 
   const buffers = init_buffers(gl);
-  console.log("Created buffers: %o", buffers);
 
   draw_scene(gl, program_info, buffers);
 }
 
 main();
+
+// vim: set ts=2 sw=2:

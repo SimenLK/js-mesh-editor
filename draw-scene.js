@@ -41,10 +41,12 @@ function draw_scene(gl, program_info, buffers) {
   mat4.translate(
     model_view_matrix,
     model_view_matrix,
-    [-0.0, 0.0, -6.0],
+    [-0.0, 0.0, -9.0],
   );
 
   set_pos_attribute(gl, program_info, buffers);
+
+  gl.useProgram(program_info.program);
 
   gl.uniformMatrix4fv(
     program_info.uniform_locations.projection_matrix,
