@@ -9,27 +9,32 @@
 
   <script id="vertex-shader" type="x-shader/x-vertex">
     attribute vec4 a_vertexPosition;
-    attribute vec4 a_vertex_color;
+    attribute vec3 a_barycentric;
 
     uniform mat4 u_model_to_world;
     uniform mat4 u_world_to_view;
     uniform mat4 u_view_to_projection;
 
-    varying lowp vec4 v_color;
+    varying lowp vec3 v_barycentric;
 
     void main()
     {
       gl_Position = u_view_to_projection * u_world_to_view * u_model_to_world * a_vertexPosition;
-      v_color = a_vertex_color;
+
+      v_barycentric = a_barycentric;
     }
   </script>
 
   <script id="fragment-shader" type="x-shader/x-fragment">
-    varying lowp vec4 v_color;
+    varying lowp vec3 v_barycentric;
 
     void main()
     {
-      gl_FragColor = v_color;
+      if (v_barycentric.x < 0.01 || v_barycentric.y < 0.01 || v_barycentric.z < 0.01) {
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+      } else {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+      }
     }
   </script>
 
@@ -58,7 +63,10 @@
     </div>
   </div>
 
-  <canvas id="mesh-editor" width="640" height="480"></canvas>
+  <div class="canvas-container">
+    <canvas id="mesh-editor" width="640" height="480"></canvas>
+    <div id="fps-chart">test</div>
+  </div>
 </main>
 
 </body>

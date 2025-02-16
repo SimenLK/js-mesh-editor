@@ -5,6 +5,10 @@ import { draw_scene } from "./draw-scene.js";
 
 console.log("Hello from js");
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function load_shader(gl, type, src) {
   const shader = gl.createShader(type);
 
@@ -45,27 +49,55 @@ function init_shader_program(gl, vertex_shader_src, fragment_shader_src) {
   return program;
 }
 
+function calculate_barycentric(length) {
+}
+
 function create_mesh() {
+  const vertices = [
+    0.0, 1.0,
+    -1.0, -1.0,
+    1.0, -2.0,
+    2.0, 1.0,
+    3.0, -1.0,
+  ];
+  const indices = [
+    0, 1, 2,
+    0, 2, 3,
+    2, 3, 4,
+  ];
+  //const barycentric = calculate_barycentric(vertices.length);
+  const barycentric = [
+    1, 0, 0,
+    0, 1, 0,
+    0, 0, 1,
+    0, 1, 0,
+    1, 0, 0,
+    0, 0, 1,
+    0, 1, 0,
+    1, 0, 0,
+    0, 0, 1,
+  ];
   const mesh = {
     pos: { x: -1.0, y: 1.0 },
     // y axis rotation in radians?
     angle: 0.0,
     // A triangle
-    vertices: [
-      0.0, 1.0,
-      1.0, -1.0,
-      -1.0, -1.0,
-    ],
+    vertices: vertices,
+    barycentric: barycentric,
+    indices: indices,
     colors: [
       1.0, 0.0, 0.0, 1.0, // red
       0.0, 1.0, 0.0, 1.0, // green
       0.0, 0.0, 1.0, 1.0, // blue
+      1.0, 0.0, 1.0, 1.0, // idk
     ],
   };
 
   return mesh;
 }
 
+let fps_chart_elem = document.getElementById("fps-chart");
+let times = [];
 let start_time_s;
 
 const model_rotate_speed = 2.0;
@@ -78,6 +110,15 @@ function step(state, timestamp_ms) {
   const timestamp_s = 0.001 * timestamp_ms;
   const elapsed_s = timestamp_s - start_time_s;
   start_time_s = timestamp_s;
+
+  if (state.frame_count % 100 === 0) {
+    times.push(1000 * elapsed_s);
+    const formatted = times.map((time) => time.toFixed(5));
+    fps_chart_elem.innerText = formatted;
+    if (times.length > 10) {
+      times.shift();
+    }
+  }
 
   let new_pos = mesh.pos;
 
@@ -120,6 +161,8 @@ function step(state, timestamp_ms) {
   // console.debug("Render: timestamp: %i - %i = %i", timestamp, start_time, elapsed);
   draw_scene(state);
 
+  state.frame_count += 1;
+
   requestAnimationFrame((t) => step(state, t));
 }
 
@@ -152,7 +195,8 @@ function main() {
     program: shader_program,
     attrib_locations: {
       vertex_pos: gl.getAttribLocation(shader_program, "a_vertexPosition"),
-      vertex_color: gl.getAttribLocation(shader_program, "a_vertex_color"),
+      // vertex_color: gl.getAttribLocation(shader_program, "a_vertex_color"),
+      vertex_barycentric: gl.getAttribLocation(shader_program, "a_barycentric"),
     },
     uniform_locations: {
       model_to_world: gl.getUniformLocation(shader_program, "u_model_to_world"),
@@ -163,9 +207,10 @@ function main() {
 
   const mesh = create_mesh();
 
-  const buffers = init_buffers(gl, mesh.vertices, mesh.colors);
+  const buffers = init_buffers(gl, mesh.vertices, mesh.colors, mesh.indices, mesh.barycentric);
 
   const state = {
+    frame_count: 0,
     gl: gl,
     program_info: program_info,
     buffers: buffers,

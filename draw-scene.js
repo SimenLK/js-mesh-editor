@@ -21,7 +21,7 @@ function set_pos_attribute(gl, program_info, buffers) {
 }
 
 function set_color_attribute(gl, program_info, buffers) {
-  const num_components = 3;
+  const num_components = 4;
   const type = gl.FLOAT;
   const normalize = false;
   const stride = 0;
@@ -36,8 +36,27 @@ function set_color_attribute(gl, program_info, buffers) {
     stride,
     offset,
   );
-
   gl.enableVertexAttribArray(program_info.attrib_locations.vertex_color);
+}
+
+function set_barycentric_attribute(gl, program_info, buffers) {
+  const num_components = 3;
+  const type = gl.FLOAT;
+  const normalize = false;
+  const stride = 0;
+  const offset = 0;
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffers.barycentric);
+  gl.vertexAttribPointer(
+    program_info.attrib_locations.vertex_barycentric,
+    num_components,
+    type,
+    normalize,
+    stride,
+    offset,
+  );
+
+  gl.enableVertexAttribArray(program_info.attrib_locations.vertex_barycentric);
 }
 
 function draw_scene(state) {
@@ -65,7 +84,8 @@ function draw_scene(state) {
   mat4.perspective(view_to_projection, fov, aspect_ratio, z_near, z_far);
 
   set_pos_attribute(gl, program_info, buffers);
-  set_color_attribute(gl, program_info, buffers);
+  // set_color_attribute(gl, program_info, buffers);
+  set_barycentric_attribute(gl, program_info, buffers);
 
   const model_to_world = mat4.create();
   const world_to_view = mat4.create();
@@ -100,6 +120,8 @@ function draw_scene(state) {
     );
   }
 
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.index);
+
   gl.useProgram(program_info.program);
 
   gl.uniformMatrix4fv(
@@ -121,9 +143,10 @@ function draw_scene(state) {
   );
 
   {
+    const vertex_count = mesh.indices.length;
+    const type = gl.UNSIGNED_SHORT;
     const offset = 0;
-    const vertex_count = 3;
-    gl.drawArrays(gl.TRIANGLES, offset, vertex_count);
+    gl.drawElements(gl.TRIANGLES, vertex_count, type, offset);
   }
 }
 

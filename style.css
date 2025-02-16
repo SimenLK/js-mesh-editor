@@ -7,7 +7,7 @@ main {
 }
 
 canvas {
-  flex-grow: 1;
+  width: 100%;
   image-rendering: pixelated;
 }
 
@@ -15,6 +15,10 @@ canvas {
   flex-basis: 200px;
   padding: 20px;
   border-right: 1px black solid;
+}
+
+.canvas-container {
+  flex-grow: 1;
 }
 
 /* vim: set et ts=2 sw=2 */
