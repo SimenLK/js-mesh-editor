@@ -9,21 +9,27 @@
 
   <script id="vertex-shader" type="x-shader/x-vertex">
     attribute vec4 a_vertexPosition;
+    attribute vec4 a_vertex_color;
 
     uniform mat4 u_model_to_world;
     uniform mat4 u_world_to_view;
     uniform mat4 u_view_to_projection;
 
+    varying lowp vec4 v_color;
+
     void main()
     {
       gl_Position = u_view_to_projection * u_world_to_view * u_model_to_world * a_vertexPosition;
+      v_color = a_vertex_color;
     }
   </script>
 
   <script id="fragment-shader" type="x-shader/x-fragment">
+    varying lowp vec4 v_color;
+
     void main()
     {
-      gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+      gl_FragColor = v_color;
     }
   </script>
 
@@ -38,7 +44,7 @@
     <p>The purpose of this app is to test whether we can create a WebGL mesh editor. How will it be to interact with the mesh, modifying it with mouse-dragging, node deletion, and subsequent re-uploading of the mesh to the GPU.</p>
   </div>
 
-  <canvas id="mesh-editor"></canvas>
+  <canvas id="mesh-editor" width="640" height="480"></canvas>
 </main>
 
 </body>

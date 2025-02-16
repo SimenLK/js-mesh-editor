@@ -121,6 +121,7 @@ function main() {
     program: shader_program,
     attrib_locations: {
       vertex_pos: gl.getAttribLocation(shader_program, "a_vertexPosition"),
+      vertex_color: gl.getAttribLocation(shader_program, "a_vertex_color"),
     },
     uniform_locations: {
       model_to_world: gl.getUniformLocation(shader_program, "u_model_to_world"),
@@ -130,6 +131,9 @@ function main() {
   };
 
   const mesh = create_mesh();
+
+  const buffers = init_buffers(gl, mesh.vertices, mesh.colors);
+
   const state = {
     gl: gl,
     program_info: program_info,

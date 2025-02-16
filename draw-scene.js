@@ -20,7 +20,26 @@ function set_pos_attribute(gl, program_info, buffers) {
   gl.enableVertexAttribArray(program_info.attrib_locations.vertex_pos);
 }
 
-function draw_scene(gl, program_info, buffers) {
+function set_color_attribute(gl, program_info, buffers) {
+  const num_components = 4;
+  const type = gl.FLOAT;
+  const normalize = false;
+  const stride = 0;
+  const offset = 0;
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
+  gl.vertexAttribPointer(
+    program_info.attrib_locations.vertex_color,
+    num_components,
+    type,
+    normalize,
+    stride,
+    offset,
+  );
+
+  gl.enableVertexAttribArray(program_info.attrib_locations.vertex_color);
+}
+
 function draw_scene(state) {
   const {
     gl,
@@ -45,6 +64,7 @@ function draw_scene(state) {
   mat4.perspective(view_to_projection, fov, aspect_ratio, z_near, z_far);
 
   set_pos_attribute(gl, program_info, buffers);
+  set_color_attribute(gl, program_info, buffers);
 
   const model_to_world = mat4.create();
   const world_to_view = mat4.create();
