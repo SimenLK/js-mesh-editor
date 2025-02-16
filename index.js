@@ -1,3 +1,5 @@
+import { mat4 } from "gl-matrix";
+
 import { init_buffers } from "./init-buffers.js";
 import { draw_scene } from "./draw-scene.js";
 
@@ -43,6 +45,53 @@ function init_shader_program(gl, vertex_shader_src, fragment_shader_src) {
   return program;
 }
 
+function create_mesh() {
+  const mesh = {
+    pos: { x: -1.0, y: 1.0 },
+    // Four points for a triangle strip.
+    // TODO: Make indicies and triangles
+    vertices: [
+      1.0, 1.0,
+      -1.0, 1.0,
+      1.0, -1.0,
+      -1.0, -1.0,
+    ],
+    colors: [
+      1.0, 1.0, 1.0, 1.0, // white
+      1.0, 0.0, 0.0, 1.0, // red
+      0.0, 1.0, 0.0, 1.0, // green
+      0.0, 0.0, 1.0, 1.0, // blue
+    ],
+  };
+
+  return mesh;
+}
+
+let start_time;
+
+function step(state, timestamp) {
+  const mesh = state.mesh;
+
+  const elapsed = timestamp - start_time;
+  start_time = timestamp;
+
+  let new_pos = mesh.pos;
+
+  if (state.keys.left) {
+    new_pos.x -= 0.01;
+  }
+  if (state.keys.right) {
+    new_pos.x += 0.01;
+  }
+
+  state.mesh.pos = new_pos;
+
+  // console.debug("Render: timestamp: %i - %i = %i", timestamp, start_time, elapsed);
+  draw_scene(state);
+
+  requestAnimationFrame((t) => step(state, t));
+}
+
 function main() {
   const canvas = document.getElementById("mesh-editor");
   console.log("We found the canvas: %o", canvas);
@@ -60,22 +109,72 @@ function main() {
 
   console.log("Vertex shader:\n%s", vertex_shader_elem.innerText);
 
-  const shader_program = init_shader_program(gl, vertex_shader_elem.innerText, fragment_shader_elem.innerText);
+  const shader_program =
+    init_shader_program(
+      gl,
+      vertex_shader_elem.innerText,
+      fragment_shader_elem.innerText
+    );
 
+  // TODO: Only the program info?
   const program_info = {
     program: shader_program,
     attrib_locations: {
       vertex_pos: gl.getAttribLocation(shader_program, "a_vertexPosition"),
     },
     uniform_locations: {
-      projection_matrix: gl.getUniformLocation(shader_program, "u_projectionMatrix"),
-      model_view_matrix: gl.getUniformLocation(shader_program, "u_modelViewMatrix"),
+      model_to_world: gl.getUniformLocation(shader_program, "u_model_to_world"),
+      world_to_view: gl.getUniformLocation(shader_program, "u_world_to_view"),
+      view_to_projection: gl.getUniformLocation(shader_program, "u_view_to_projection"),
     },
   };
 
-  const buffers = init_buffers(gl);
+  const mesh = create_mesh();
+  const state = {
+    gl: gl,
+    program_info: program_info,
+    buffers: buffers,
+    keys: {
+      left: false,
+      right: false,
+    },
+    mesh: mesh,
+  };
 
-  draw_scene(gl, program_info, buffers);
+  console.log("Starting render with state: %o", state);
+  //console.dir(canvas);
+  console.debug("canvas type: %s", typeof(canvas));
+
+  document.onkeydown = (event) => {
+    // console.debug("key down: %s => %i", event.key, event.keyCode);
+
+    switch (event.keyCode) {
+      case 37: {
+        state.keys.left = true;
+        break;
+      }
+      case 39: {
+        state.keys.right = true;
+        break;
+      }
+    }
+  };
+
+  document.onkeyup = (event) => {
+    // console.debug("document key up: %s => %i", event.key, event.keyCode);
+
+    switch (event.keyCode) {
+      case 37: {
+        state.keys.left = false;
+        break;
+      }
+      case 39: {
+        state.keys.right = false;
+      } break;
+    }
+  };
+
+  requestAnimationFrame((t) => step(state, t));
 }
 
 main();

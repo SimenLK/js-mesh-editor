@@ -10,12 +10,13 @@
   <script id="vertex-shader" type="x-shader/x-vertex">
     attribute vec4 a_vertexPosition;
 
-    uniform mat4 u_projectionMatrix;
-    uniform mat4 u_modelViewMatrix;
+    uniform mat4 u_model_to_world;
+    uniform mat4 u_world_to_view;
+    uniform mat4 u_view_to_projection;
 
     void main()
     {
-      gl_Position = u_projectionMatrix * u_modelViewMatrix * a_vertexPosition;
+      gl_Position = u_view_to_projection * u_world_to_view * u_model_to_world * a_vertexPosition;
     }
   </script>
 

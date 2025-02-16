@@ -21,6 +21,14 @@ function set_pos_attribute(gl, program_info, buffers) {
 }
 
 function draw_scene(gl, program_info, buffers) {
+function draw_scene(state) {
+  const {
+    gl,
+    program_info,
+    buffers,
+    mesh
+  } = state;
+
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
   gl.clearDepth(1.0);
   gl.enable(gl.DEPTH_TEST);
@@ -32,32 +40,45 @@ function draw_scene(gl, program_info, buffers) {
   const aspect_ratio = gl.canvas.clientWidth / gl.canvas.clientHeight;
   const z_near = 0.1;
   const z_far = 100.0;
-  const projection_matrix = mat4.create();
+  const view_to_projection = mat4.create();
 
-  mat4.perspective(projection_matrix, fov, aspect_ratio, z_near, z_far);
-
-  const model_view_matrix = mat4.create();
-
-  mat4.translate(
-    model_view_matrix,
-    model_view_matrix,
-    [-0.0, 0.0, -9.0],
-  );
+  mat4.perspective(view_to_projection, fov, aspect_ratio, z_near, z_far);
 
   set_pos_attribute(gl, program_info, buffers);
+
+  const model_to_world = mat4.create();
+  const world_to_view = mat4.create();
+
+  mat4.translate(
+    model_to_world,
+    model_to_world,
+    [mesh.pos.x, 0.0, 0.0],
+  );
+
+  mat4.translate(
+    world_to_view,
+    world_to_view,
+    [-0.0, 0.0, -9.0],
+  );
 
   gl.useProgram(program_info.program);
 
   gl.uniformMatrix4fv(
-    program_info.uniform_locations.projection_matrix,
+    program_info.uniform_locations.model_to_world,
     false,
-    projection_matrix,
+    model_to_world,
   );
 
   gl.uniformMatrix4fv(
-    program_info.uniform_locations.model_view_matrix,
+    program_info.uniform_locations.world_to_view,
     false,
-    model_view_matrix,
+    world_to_view,
+  );
+
+  gl.uniformMatrix4fv(
+    program_info.uniform_locations.view_to_projection,
+    false,
+    view_to_projection,
   );
 
   {
