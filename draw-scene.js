@@ -1,4 +1,4 @@
-import { mat4 } from "gl-matrix";
+import { mat4, vec3 } from "gl-matrix";
 
 function set_pos_attribute(gl, program_info, buffers) {
   const num_components = 2;
@@ -21,7 +21,7 @@ function set_pos_attribute(gl, program_info, buffers) {
 }
 
 function set_color_attribute(gl, program_info, buffers) {
-  const num_components = 4;
+  const num_components = 3;
   const type = gl.FLOAT;
   const normalize = false;
   const stride = 0;
@@ -45,6 +45,7 @@ function draw_scene(state) {
     gl,
     program_info,
     buffers,
+    camera,
     mesh
   } = state;
 
@@ -69,17 +70,35 @@ function draw_scene(state) {
   const model_to_world = mat4.create();
   const world_to_view = mat4.create();
 
+  mat4.rotateZ(
+    model_to_world,
+    model_to_world,
+    mesh.angle,
+  );
+
+  // Translate the model
   mat4.translate(
     model_to_world,
     model_to_world,
     [mesh.pos.x, 0.0, 0.0],
   );
 
-  mat4.translate(
-    world_to_view,
-    world_to_view,
-    [-0.0, 0.0, -9.0],
-  );
+  const fixed_direction = true;
+  if (fixed_direction) {
+    // Move the camera?
+    mat4.translate(
+      world_to_view,
+      world_to_view,
+      camera.pos,
+    );
+  } else {
+    mat4.lookAt(
+      world_to_view,
+      camera.pos,
+      camera.dir,
+      camera.up,
+    );
+  }
 
   gl.useProgram(program_info.program);
 
@@ -103,8 +122,8 @@ function draw_scene(state) {
 
   {
     const offset = 0;
-    const vertex_count = 4;
-    gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertex_count);
+    const vertex_count = 3;
+    gl.drawArrays(gl.TRIANGLES, offset, vertex_count);
   }
 }
 

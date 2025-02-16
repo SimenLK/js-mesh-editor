@@ -42,6 +42,20 @@
     <h1>Mesh editor</h1>
     <p>Hello there. This is a test. We're testing whether this paragraph will wrap properly.</p>
     <p>The purpose of this app is to test whether we can create a WebGL mesh editor. How will it be to interact with the mesh, modifying it with mouse-dragging, node deletion, and subsequent re-uploading of the mesh to the GPU.</p>
+
+    <div>
+      <code>Mouse:</code>
+      <div style="padding-left: 15px;">
+        <div>
+          <code>Pos:</code>
+          <code id="mouse-pos"></code>
+        </div>
+        <div>
+          <code>Pressed:</code>
+          <code id="mouse-pressed"></code>
+        </div>
+      </div>
+    </div>
   </div>
 
   <canvas id="mesh-editor" width="640" height="480"></canvas>

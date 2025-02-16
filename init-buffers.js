@@ -3,7 +3,7 @@ function init_position_buffer(gl, vertices) {
 
   gl.bindBuffer(gl.ARRAY_BUFFER, pos_buffer);
 
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 
   return pos_buffer;
 }
