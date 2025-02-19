@@ -1,6 +1,6 @@
 import { mat4, vec3, vec2 } from "gl-matrix";
 
-import { init_buffers } from "./init-buffers.js";
+import { init_buffers, upload_new_buffer_data, upload_buffer_segment } from "./init-buffers.js";
 import { draw_scene } from "./draw-scene.js";
 
 console.log("Hello from js");
@@ -52,25 +52,29 @@ function init_shader_program(gl, vertex_shader_src, fragment_shader_src) {
 function calculate_barycentric(length) {
 }
 
+// TODO: Load mesh from file. Drop file into browser for easy access.
 function create_mesh() {
-  const vertices = [
-    0.0, 1.0,
+  const vertices = new Float32Array([
+     0.0,  1.0,
     -1.0, -1.0,
-    1.0, -2.0,
-    2.0, 1.0,
-    3.0, -1.0,
-  ];
+     1.0, -2.0,
+     2.0,  1.0,
+     3.0, -1.0,
+     4.0, -1.0,
+     3.0, -2.0,
+  ]);
   const indices = [
     0, 1, 2,
     0, 2, 3,
     2, 3, 4,
+    4, 5, 3,
+    4, 6, 2,
+    5, 6, 4,
   ];
   //const barycentric = calculate_barycentric(vertices.length);
   const barycentric = [
-    1, 0, 0,
     0, 1, 0,
     0, 0, 1,
-    0, 1, 0,
     1, 0, 0,
     0, 0, 1,
     0, 1, 0,
@@ -120,6 +124,19 @@ function step(state, timestamp_ms) {
     }
   }
 
+  if (mouse.pressed) {
+    let delta = vec2.create();
+    delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
+    // TODO: Optional sensitivity on the scale here?
+    delta = vec2.scale(vec2.create(), delta, 0.02);
+
+    // TODO: I don't know why I have to flip the y here
+    const v3 = vec3.fromValues(delta[0], -delta[1], 0.0);
+    camera.pos = vec3.add(vec3.create(), camera.pos, v3);
+  }
+
+  state.mouse.old_pos = state.mouse.pos;
+
   let new_pos = mesh.pos;
 
   // NOTE: Is the cameras movement inverted?
@@ -135,7 +152,6 @@ function step(state, timestamp_ms) {
   if (state.keys.down) {
     camera.pos[1] += camera.speed * elapsed_s;
   }
-
   if (state.keys.rotate_left) {
     mesh.angle -= model_rotate_speed * elapsed_s;
   }
@@ -143,20 +159,41 @@ function step(state, timestamp_ms) {
     mesh.angle += model_rotate_speed * elapsed_s;
   }
 
-  if (mouse.pressed) {
-    let delta = vec2.create();
-    delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
-    // TODO: Optional sensitivity on the scale here?
-    delta = vec2.scale(vec2.create(), delta, 0.02);
+  state.mesh.pos = new_pos;
 
-    // TODO: I don't know why I have to flip the y here
-    const v3 = vec3.fromValues(delta[0], -delta[1], 0.0);
-    camera.pos = vec3.add(vec3.create(), camera.pos, v3);
+  let vertex_moved = false;
+  let new_vertex_pos =
+    vec2.fromValues(
+      mesh.vertices[state.selected_vertex_idx],
+      mesh.vertices[state.selected_vertex_idx + 1],
+    );
+
+  if (state.keys.move_left) {
+    new_vertex_pos[0] -= 0.1;
+    vertex_moved = true;
+  }
+  if (state.keys.move_right) {
+    new_vertex_pos[0] += 0.1;
+    vertex_moved = true;
+  }
+  if (state.keys.move_up) {
+    new_vertex_pos[1] += 0.1;
+    vertex_moved = true;
+  }
+  if (state.keys.move_down) {
+    new_vertex_pos[1] -= 0.1;
+    vertex_moved = true;
   }
 
-  state.mouse.old_pos = state.mouse.pos;
+  mesh.vertices[state.selected_vertex_idx] = new_vertex_pos[0];
+  mesh.vertices[state.selected_vertex_idx + 1] = new_vertex_pos[1];
 
-  state.mesh.pos = new_pos;
+  if (vertex_moved) {
+    // TODO: Try not updating the buffer
+    const gl_info = state.gl_info;
+    const gl = gl_info.gl;
+    upload_buffer_segment(gl, gl_info.buffers.position, 0, new_vertex_pos);
+  }
 
   // console.debug("Render: timestamp: %i - %i = %i", timestamp, start_time, elapsed);
   draw_scene(state);
@@ -209,11 +246,18 @@ function main() {
 
   const buffers = init_buffers(gl, mesh.vertices, mesh.colors, mesh.indices, mesh.barycentric);
 
+  // TODO: Create state function. Make defaults
   const state = {
     frame_count: 0,
-    gl: gl,
-    program_info: program_info,
-    buffers: buffers,
+    // NOTE: editor mode.
+    // - "pan": moving the model and scene around
+    // - "select": selcting vertices to edit them
+    mode: "pan",
+    gl_info: {
+      gl: gl,
+      program_info: program_info,
+      buffers: buffers,
+    },
     keys: {
       left: false,
       right: false,
@@ -221,6 +265,10 @@ function main() {
       down: false,
       rotate_left: false,
       rotate_right: false,
+      move_left: false,
+      move_up: false,
+      move_right: false,
+      move_down: false,
     },
     mouse: {
       pos: vec2.create(),
@@ -234,6 +282,7 @@ function main() {
       speed: 2.0,
     },
     mesh: mesh,
+    selected_vertex_idx: 0,
   };
 
   // NOTE: Init the sidebar debug stats
@@ -245,10 +294,10 @@ function main() {
   console.log("Starting render with state: %o", state);
   //console.dir(canvas);
   console.debug("canvas type: %s", typeof(canvas));
+  console.debug("state.buffers.index is Float32Array?: %o", state.gl_info.buffers.index instanceof Float32Array);
 
   document.onkeydown = (event) => {
      //console.debug("key down: %s => %i", event.key, event.keyCode);
-
     switch (event.keyCode) {
       case 37: {
         state.keys.left = true;
@@ -266,12 +315,29 @@ function main() {
         state.keys.down = true;
         break;
       }
+
+      case 65: { // a
+        state.keys.move_left = true;
+        break;
+      }
+      case 68: { // d
+        state.keys.move_right = true;
+        break;
+      }
       case 69: { // e
         state.keys.rotate_right = true;
         break;
       }
       case 81: { // q
         state.keys.rotate_left = true;
+        break;
+      }
+      case 83: { // s
+        state.keys.move_down = true;
+        break;
+      }
+      case 87: { // w
+        state.keys.move_up = true;
         break;
       }
     }
@@ -297,12 +363,28 @@ function main() {
         state.keys.down = false;
         break;
       }
-      case 69: {
+      case 65: { // a
+        state.keys.move_left = false;
+        break;
+      }
+      case 68: { // d
+        state.keys.move_right = false;
+        break;
+      }
+      case 69: { // e
         state.keys.rotate_right = false;
         break;
       }
-      case 81: {
+      case 81: { // q
         state.keys.rotate_left = false;
+        break;
+      }
+      case 83: { // s
+        state.keys.move_down = false;
+        break;
+      }
+      case 87: { // w
+        state.keys.move_up = false;
         break;
       }
     }

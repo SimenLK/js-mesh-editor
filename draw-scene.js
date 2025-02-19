@@ -61,12 +61,12 @@ function set_barycentric_attribute(gl, program_info, buffers) {
 
 function draw_scene(state) {
   const {
-    gl,
-    program_info,
-    buffers,
+    gl_info,
     camera,
     mesh
   } = state;
+
+  const { gl, program_info, buffers } = gl_info;
 
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
   gl.clearDepth(1.0);
@@ -83,6 +83,7 @@ function draw_scene(state) {
 
   mat4.perspective(view_to_projection, fov, aspect_ratio, z_near, z_far);
 
+  // NOTE: This is not uplading the buffer, only activating it for this frame.
   set_pos_attribute(gl, program_info, buffers);
   // set_color_attribute(gl, program_info, buffers);
   set_barycentric_attribute(gl, program_info, buffers);

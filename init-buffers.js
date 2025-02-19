@@ -3,7 +3,7 @@ function init_position_buffer(gl, vertices) {
 
   gl.bindBuffer(gl.ARRAY_BUFFER, pos_buffer);
 
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 
   return pos_buffer;
 }
@@ -50,4 +50,19 @@ function init_buffers(gl, vertices, colors, indices, barycentric) {
   };
 }
 
-export { init_buffers };
+function upload_new_buffer_data(gl, buffer_index, data) {
+  console.assert(data instanceof Float32Array);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer_index);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+}
+
+function upload_buffer_segment(gl, buffer_index, index, data) {
+  // TODO: Enforce the user providing the typed float array
+  const float_array = new Float32Array(data)
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer_index);
+  gl.bufferSubData(gl.ARRAY_BUFFER, index * float_array.BYTES_PER_ELEMENT, float_array);
+}
+
+export { init_buffers, upload_new_buffer_data, upload_buffer_segment };
