@@ -2,6 +2,8 @@ import { mat4, vec4, vec3, vec2 } from "gl-matrix";
 
 import { init_buffers, upload_new_buffer_data, upload_buffer_segment } from "./init-buffers.js";
 import { draw_scene } from "./draw-scene.js";
+import { find_vertex_idx } from "./math.js";
+import { create_mesh } from "./mesh.js";
 
 console.log("Hello from js");
 
@@ -50,81 +52,6 @@ function init_shader_program(gl, vertex_shader_src, fragment_shader_src) {
 }
 
 function calculate_barycentric(length) {
-}
-
-// TODO: Load mesh from file. Drop file into browser for easy access.
-function create_mesh() {
-  const vertices = new Float32Array([
-     0.0,  1.0,
-    -1.0, -1.0,
-     0.0,  0.0,
-     2.0,  1.0,
-     3.0, -1.0,
-     4.0, -1.0,
-     3.0, -2.0,
-  ]);
-  const indices = [
-    0, 1, 2,
-    0, 2, 3,
-    2, 3, 4,
-    4, 5, 3,
-    4, 6, 2,
-    5, 6, 4,
-  ];
-  //const barycentric = calculate_barycentric(vertices.length);
-  const barycentric = [
-    0, 1, 0,
-    0, 0, 1,
-    1, 0, 0,
-    0, 0, 1,
-    0, 1, 0,
-    1, 0, 0,
-    0, 0, 1,
-  ];
-  const mesh = {
-    model_to_world: mat4.fromTranslation(mat4.create(), vec3.fromValues(0.0, 0.0, 0.0)),
-    // y axis rotation in radians?
-    angle: Math.PI,
-    // A triangle
-    vertices: vertices,
-    barycentric: barycentric,
-    indices: indices,
-    colors: [
-      1.0, 0.0, 0.0, 1.0, // red
-      0.0, 1.0, 0.0, 1.0, // green
-      0.0, 0.0, 1.0, 1.0, // blue
-      1.0, 0.0, 1.0, 1.0, // idk
-    ],
-  };
-
-  mat4.rotateY(mesh.model_to_world, mesh.model_to_world, mesh.angle);
-
-  return mesh;
-}
-
-function get_mesh_vertex(vertices, z, idx) {
-  const result = vec3.fromValues(vertices[idx], vertices[idx + 1], z,);
-
-  return result;
-}
-
-function ray_cast(origin, dir, time) {
-  let result = vec3.create();
-
-  vec3.add(result, origin, vec3.scale(vec3.create(), dir, time));
-
-  return result;
-}
-
-function find_plane_normal(q, r, s) {
-  let result = vec3.create();
-
-  const qr = vec3.sub(vec3.create(), q, r);
-  const qs = vec3.sub(vec3.create(), q, s);
-
-  result = vec3.cross(vec3.create(), qr, qs);
-
-  return result;
 }
 
 let fps_chart_elem = document.getElementById("fps-chart");
@@ -177,89 +104,10 @@ function step(state, timestamp_ms) {
       }
 
       case "select": {
-        const gl_info = state.gl_info;
-        const gl = gl_info.gl;
-        const x = (2.0 * mouse.pos[0]) / gl.drawingBufferWidth - 1.0;
-        const y = 1.0 - (2.0 * mouse.pos[1]) / gl.drawingBufferHeight;
-        // NOTE: normalized device coordinates
-        const ray_nds = vec3.fromValues(x, y, 1);
-        // console.debug("mouse normalized device coord to world: %s", vec3.str(ray_nds));
-        const ray_clip = vec4.fromValues(ray_nds[0], ray_nds[1], -1, 1);
+        const new_idx = find_vertex_idx(state, mouse);
 
-        const inverted_view_to_projection = mat4.invert(mat4.create(), state.view_to_projection);
-        let ray_eye = vec4.transformMat4(vec4.create(), ray_clip, inverted_view_to_projection);
-        ray_eye = vec4.fromValues(ray_eye[0], ray_eye[1], -1, 0);
-
-        const inverse_view = mat4.invert(mat4.create(), state.world_to_view)
-
-        const ray_world_4 = vec4.transformMat4(vec4.create(), ray_eye, inverse_view);
-        const ray_world = vec3.fromValues(ray_world_4[0], ray_world_4[1], ray_world_4[2]);
-        const ray_world_norm = vec3.normalize(vec3.create(), ray_world);
-
-        // NOTE: World coorinates from here!
-        const camera_pos = mat4.getTranslation(vec3.create(), state.world_to_view);
-        const mesh_pos = mat4.getTranslation(vec3.create(), mesh.model_to_world);
-
-        console.debug("Origin %s with ray: %s", vec3.str(camera_pos), vec3.str(ray_world_norm));
-
-        // NOTE: Create a plane from our mesh. The first three points
-        const q = get_mesh_vertex(mesh.vertices, mesh_pos[2], 0);
-        const r = get_mesh_vertex(mesh.vertices, mesh_pos[2], 2);
-        const s = get_mesh_vertex(mesh.vertices, mesh_pos[2], 4);
-        const plane_normal = find_plane_normal(q, r, s);
-
-        const ray_dot_norm = vec3.dot(ray_world_norm, plane_normal);
-
-        if (ray_dot_norm === 0) {
-        } else {
-          const plane_normal_dot_plane_point = vec3.dot(plane_normal, mesh_pos);
-          const plane_normal_dot_camera = vec3.dot(plane_normal, camera_pos);
-          const plane_camera_dist = vec3.dist(vec3.create(), camera_pos, mesh_pos);
-          const t = ((plane_normal_dot_plane_point - plane_normal_dot_camera) / ray_dot_norm);
-
-          if (t < 0) {
-            console.error("You're behind the plane dumbo! t = %f", t);
-          } else {
-            const ray_at_t = ray_cast(camera_pos, ray_world_norm, t);
-
-            console.debug(
-              "Ray(%f) = %s",
-              t,
-              vec3.str(ray_at_t),
-            );
-
-            let smallest_distance = Number.MAX_VALUE;
-
-            // TODO: Walk the ray along its vector to see if we hit a vertex
-            for (let idx = 0; idx < mesh.vertices.length; idx += 2) {
-              const vertex =
-                vec3.fromValues(
-                  mesh.vertices[idx],
-                  mesh.vertices[idx + 1],
-                  0.0,
-                );
-              // Move the vertex into its position in the world
-              const in_world = vec3.transformMat4(vec3.create(), vertex, mesh.model_to_world);
-              // Move vertex in the world infront of the camera
-              const in_view = vec3.transformMat4(vec3.create(), vertex, state.world_to_view);
-              // Find the distance to the vertex in the mesh, and the vertex
-              // where our mouse ray hit the mesh plane
-              const distance = vec3.dist(in_world, ray_at_t);
-
-              console.debug(
-                "Vertex %s vs ray at t %s = %f",
-                vec3.str(in_world),
-                vec3.str(ray_at_t),
-                distance
-              );
-
-              if (distance < smallest_distance) {
-                console.debug("New vertex is idx = %d", idx);
-                smallest_distance = distance;
-                state.selected_vertex_idx = idx;
-              }
-            }
-          }
+        if (new_idx) {
+          state.selected_vertex_idx = new_idx;
         }
 
         break;
