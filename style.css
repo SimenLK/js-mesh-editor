@@ -7,18 +7,17 @@ main {
 }
 
 canvas {
-  width: 100%;
   image-rendering: pixelated;
 }
 
 .sidebar {
-  flex-basis: 200px;
+  flex-basis: 300px;
   padding: 20px;
   border-right: 1px black solid;
 }
 
 .canvas-container {
-  flex-grow: 1;
+  flex-grow: 0;
 }
 
 /* vim: set et ts=2 sw=2 */

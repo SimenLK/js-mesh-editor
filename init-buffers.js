@@ -58,11 +58,10 @@ function upload_new_buffer_data(gl, buffer_index, data) {
 }
 
 function upload_buffer_segment(gl, buffer_index, index, data) {
-  // TODO: Enforce the user providing the typed float array
-  const float_array = new Float32Array(data)
+  console.assert(data instanceof Float32Array);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer_index);
-  gl.bufferSubData(gl.ARRAY_BUFFER, index * float_array.BYTES_PER_ELEMENT, float_array);
+  gl.bufferSubData(gl.ARRAY_BUFFER, index * data.BYTES_PER_ELEMENT, data);
 }
 
 export { init_buffers, upload_new_buffer_data, upload_buffer_segment };

@@ -1,73 +1,99 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width" />
-  <title>Mesh editor</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Mesh editor</title>
 
-  <link rel="stylesheet" href="style.css"/>
+    <link rel="stylesheet" href="style.css"/>
 
-  <script id="vertex-shader" type="x-shader/x-vertex">
-    attribute vec4 a_vertexPosition;
-    attribute vec3 a_barycentric;
+    <script id="vertex-shader" type="x-shader/x-vertex">
+      attribute vec4 a_vertexPosition;
+      attribute vec3 a_barycentric;
 
-    uniform mat4 u_model_to_world;
-    uniform mat4 u_world_to_view;
-    uniform mat4 u_view_to_projection;
+      uniform mat4 u_model_to_world;
+      uniform mat4 u_world_to_view;
+      uniform mat4 u_view_to_projection;
 
-    varying lowp vec3 v_barycentric;
+      varying lowp vec3 v_barycentric;
 
-    void main()
-    {
-      gl_Position = u_view_to_projection * u_world_to_view * u_model_to_world * a_vertexPosition;
+      void main()
+      {
+        gl_Position = u_view_to_projection * u_world_to_view * u_model_to_world * a_vertexPosition;
 
-      v_barycentric = a_barycentric;
-    }
-  </script>
-
-  <script id="fragment-shader" type="x-shader/x-fragment">
-    varying lowp vec3 v_barycentric;
-
-    void main()
-    {
-      if (v_barycentric.x < 0.01 || v_barycentric.y < 0.01 || v_barycentric.z < 0.01) {
-        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-      } else {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        v_barycentric = a_barycentric;
       }
-    }
-  </script>
+    </script>
 
-  <script src="index.js" type="module"></script>
-</head>
+    <script id="fragment-shader" type="x-shader/x-fragment">
+      varying lowp vec3 v_barycentric;
 
-<body>
-<main>
-  <div class="sidebar">
-    <h1>Mesh editor</h1>
-    <p>Hello there. This is a test. We're testing whether this paragraph will wrap properly.</p>
-    <p>The purpose of this app is to test whether we can create a WebGL mesh editor. How will it be to interact with the mesh, modifying it with mouse-dragging, node deletion, and subsequent re-uploading of the mesh to the GPU.</p>
+      void main()
+      {
+        if (v_barycentric.x < 0.01 || v_barycentric.y < 0.01 || v_barycentric.z < 0.01) {
+          gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        } else {
+          gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        }
+      }
+    </script>
+  </head>
 
-    <div>
-      <code>Mouse:</code>
-      <div style="padding-left: 15px;">
+  <body>
+    <main>
+      <div class="sidebar">
+        <h1>Mesh editor</h1>
+        <p>Hello there. This is a test. We're testing whether this paragraph will wrap properly.</p>
+        <p>The purpose of this app is to test whether we can create a WebGL mesh editor. How will it be to interact with the mesh, modifying it with mouse-dragging, node deletion, and subsequent re-uploading of the mesh to the GPU.</p>
+
+        <form id="mode-form">
+          <legend>Mode:</legend>
+
+          <div>
+            <input type="radio" id="pan-radio-choice" name="mode" value="pan" checked />
+            <label for="pan-radio-choice">Pan</label>
+
+            <input type="radio" id="select-radio-choice" name="mode" value="select" />
+            <label for="select-radio-choice">Select</label>
+          </div>
+        </form>
+
         <div>
-          <code>Pos:</code>
-          <code id="mouse-pos"></code>
+          <code>Camera:</code>
+          <div style="padding-left: 15px;">
+            <div>
+              <code>Pos:</code>
+              <code id="camera-pos"></code>
+            </div>
+
+            <div>
+              <code>Dir:</code>
+              <code id="camera-dir"></code>
+            </div>
+          </div>
         </div>
+
         <div>
-          <code>Pressed:</code>
-          <code id="mouse-pressed"></code>
+          <code>Mouse:</code>
+          <div style="padding-left: 15px;">
+            <div>
+              <code>Pos:</code>
+              <code id="mouse-pos"></code>
+            </div>
+            <div>
+              <code>Pressed:</code>
+              <code id="mouse-pressed"></code>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <div class="canvas-container">
-    <canvas id="mesh-editor" width="640" height="480"></canvas>
-    <div id="fps-chart">test</div>
-  </div>
-</main>
+      <div class="canvas-container">
+        <canvas id="mesh-editor" width="640" height="480"></canvas>
+        <div id="fps-chart">test</div>
+      </div>
+    </main>
 
-</body>
+    <script src="index.js" type="module"></script>
+  </body>
 </html>

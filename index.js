@@ -1,4 +1,4 @@
-import { mat4, vec3, vec2 } from "gl-matrix";
+import { mat4, vec4, vec3, vec2 } from "gl-matrix";
 
 import { init_buffers, upload_new_buffer_data, upload_buffer_segment } from "./init-buffers.js";
 import { draw_scene } from "./draw-scene.js";
@@ -57,7 +57,7 @@ function create_mesh() {
   const vertices = new Float32Array([
      0.0,  1.0,
     -1.0, -1.0,
-     1.0, -2.0,
+     0.0,  0.0,
      2.0,  1.0,
      3.0, -1.0,
      4.0, -1.0,
@@ -82,9 +82,9 @@ function create_mesh() {
     0, 0, 1,
   ];
   const mesh = {
-    pos: { x: -1.0, y: 1.0 },
+    model_to_world: mat4.fromTranslation(mat4.create(), vec3.fromValues(0.0, 0.0, 0.0)),
     // y axis rotation in radians?
-    angle: 0.0,
+    angle: Math.PI,
     // A triangle
     vertices: vertices,
     barycentric: barycentric,
@@ -97,7 +97,34 @@ function create_mesh() {
     ],
   };
 
+  mat4.rotateY(mesh.model_to_world, mesh.model_to_world, mesh.angle);
+
   return mesh;
+}
+
+function get_mesh_vertex(vertices, z, idx) {
+  const result = vec3.fromValues(vertices[idx], vertices[idx + 1], z,);
+
+  return result;
+}
+
+function ray_cast(origin, dir, time) {
+  let result = vec3.create();
+
+  vec3.add(result, origin, vec3.scale(vec3.create(), dir, time));
+
+  return result;
+}
+
+function find_plane_normal(q, r, s) {
+  let result = vec3.create();
+
+  const qr = vec3.sub(vec3.create(), q, r);
+  const qs = vec3.sub(vec3.create(), q, s);
+
+  result = vec3.cross(vec3.create(), qr, qs);
+
+  return result;
 }
 
 let fps_chart_elem = document.getElementById("fps-chart");
@@ -124,42 +151,153 @@ function step(state, timestamp_ms) {
     }
   }
 
-  if (mouse.pressed) {
-    let delta = vec2.create();
-    delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
-    // TODO: Optional sensitivity on the scale here?
-    delta = vec2.scale(vec2.create(), delta, 0.02);
+  if (mouse.left_pressed) {
+    switch (state.mode) {
+      case "pan": {
+        if (state.fixed_direction) {
+          let delta = vec2.create();
+          delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
+          // TODO: Optional sensitivity on the scale here?
+          delta = vec2.scale(vec2.create(), delta, 0.02);
 
-    // TODO: I don't know why I have to flip the y here
-    const v3 = vec3.fromValues(delta[0], -delta[1], 0.0);
-    camera.pos = vec3.add(vec3.create(), camera.pos, v3);
+          // TODO: I don't know why I have to flip the y here
+          const v3 = vec3.fromValues(delta[0], -delta[1], 0.0);
+          camera.pos = vec3.add(vec3.create(), camera.pos, v3);
+        } else {
+          let delta = vec2.create();
+          delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
+          // TODO: Optional sensitivity on the scale here?
+          delta = vec2.scale(vec2.create(), delta, 0.02);
+
+          // TODO: I don't know why I have to flip the y here
+          const v3 = vec3.fromValues(delta[0], -delta[1], 0.0);
+          camera.dir = vec3.add(vec3.create(), camera.dir, v3);
+        }
+        break;
+      }
+
+      case "select": {
+        const gl_info = state.gl_info;
+        const gl = gl_info.gl;
+        const x = (2.0 * mouse.pos[0]) / gl.drawingBufferWidth - 1.0;
+        const y = 1.0 - (2.0 * mouse.pos[1]) / gl.drawingBufferHeight;
+        // NOTE: normalized device coordinates
+        const ray_nds = vec3.fromValues(x, y, 1);
+        // console.debug("mouse normalized device coord to world: %s", vec3.str(ray_nds));
+        const ray_clip = vec4.fromValues(ray_nds[0], ray_nds[1], -1, 1);
+
+        const inverted_view_to_projection = mat4.invert(mat4.create(), state.view_to_projection);
+        let ray_eye = vec4.transformMat4(vec4.create(), ray_clip, inverted_view_to_projection);
+        ray_eye = vec4.fromValues(ray_eye[0], ray_eye[1], -1, 0);
+
+        const inverse_view = mat4.invert(mat4.create(), state.world_to_view)
+
+        const ray_world_4 = vec4.transformMat4(vec4.create(), ray_eye, inverse_view);
+        const ray_world = vec3.fromValues(ray_world_4[0], ray_world_4[1], ray_world_4[2]);
+        const ray_world_norm = vec3.normalize(vec3.create(), ray_world);
+
+        // NOTE: World coorinates from here!
+        const camera_pos = mat4.getTranslation(vec3.create(), state.world_to_view);
+        const mesh_pos = mat4.getTranslation(vec3.create(), mesh.model_to_world);
+
+        console.debug("Origin %s with ray: %s", vec3.str(camera_pos), vec3.str(ray_world_norm));
+
+        // NOTE: Create a plane from our mesh. The first three points
+        const q = get_mesh_vertex(mesh.vertices, mesh_pos[2], 0);
+        const r = get_mesh_vertex(mesh.vertices, mesh_pos[2], 2);
+        const s = get_mesh_vertex(mesh.vertices, mesh_pos[2], 4);
+        const plane_normal = find_plane_normal(q, r, s);
+
+        const ray_dot_norm = vec3.dot(ray_world_norm, plane_normal);
+
+        if (ray_dot_norm === 0) {
+        } else {
+          const plane_normal_dot_plane_point = vec3.dot(plane_normal, mesh_pos);
+          const plane_normal_dot_camera = vec3.dot(plane_normal, camera_pos);
+          const plane_camera_dist = vec3.dist(vec3.create(), camera_pos, mesh_pos);
+          const t = ((plane_normal_dot_plane_point - plane_normal_dot_camera) / ray_dot_norm);
+
+          if (t < 0) {
+            console.error("You're behind the plane dumbo! t = %f", t);
+          } else {
+            const ray_at_t = ray_cast(camera_pos, ray_world_norm, t);
+
+            console.debug(
+              "Ray(%f) = %s",
+              t,
+              vec3.str(ray_at_t),
+            );
+
+            let smallest_distance = Number.MAX_VALUE;
+
+            // TODO: Walk the ray along its vector to see if we hit a vertex
+            for (let idx = 0; idx < mesh.vertices.length; idx += 2) {
+              const vertex =
+                vec3.fromValues(
+                  mesh.vertices[idx],
+                  mesh.vertices[idx + 1],
+                  0.0,
+                );
+              // Move the vertex into its position in the world
+              const in_world = vec3.transformMat4(vec3.create(), vertex, mesh.model_to_world);
+              // Move vertex in the world infront of the camera
+              const in_view = vec3.transformMat4(vec3.create(), vertex, state.world_to_view);
+              // Find the distance to the vertex in the mesh, and the vertex
+              // where our mouse ray hit the mesh plane
+              const distance = vec3.dist(in_world, ray_at_t);
+
+              console.debug(
+                "Vertex %s vs ray at t %s = %f",
+                vec3.str(in_world),
+                vec3.str(ray_at_t),
+                distance
+              );
+
+              if (distance < smallest_distance) {
+                console.debug("New vertex is idx = %d", idx);
+                smallest_distance = distance;
+                state.selected_vertex_idx = idx;
+              }
+            }
+          }
+        }
+
+        break;
+      }
+
+      default: {
+        console.error("State in invalid mode: %s", state.mode);
+      }
+    }
+  }
+
+  if (state.keys.move_left) {
+    camera.pos[0] -= camera.speed * elapsed_s;
+  }
+  if (state.keys.move_forward) {
+    camera.pos[2] += camera.speed * elapsed_s;
+  }
+  if (state.keys.move_right) {
+    camera.pos[0] += camera.speed * elapsed_s;
+  }
+  if (state.keys.move_backward) {
+    camera.pos[2] -= camera.speed * elapsed_s;
   }
 
   state.mouse.old_pos = state.mouse.pos;
 
-  let new_pos = mesh.pos;
+  let new_pos = mesh.world_pos;
 
-  // NOTE: Is the cameras movement inverted?
-  if (state.keys.left) {
-    camera.pos[0] += camera.speed * elapsed_s;
-  }
-  if (state.keys.up) {
-    camera.pos[1] -= camera.speed * elapsed_s;
-  }
-  if (state.keys.right) {
-    camera.pos[0] -= camera.speed * elapsed_s;
-  }
-  if (state.keys.down) {
-    camera.pos[1] += camera.speed * elapsed_s;
-  }
   if (state.keys.rotate_left) {
-    mesh.angle -= model_rotate_speed * elapsed_s;
+    const to_rotate = model_rotate_speed * elapsed_s;
+    state.model_to_world = mat4.rotateZ(mat4.create(), state.model_to_world, to_rotate);
   }
   if (state.keys.rotate_right) {
-    mesh.angle += model_rotate_speed * elapsed_s;
+    const to_rotate = model_rotate_speed * elapsed_s;
+    state.model_to_world = mat4.rotateZ(mat4.create(), state.model_to_world, -to_rotate);
   }
 
-  state.mesh.pos = new_pos;
+  state.mesh.world_pos = new_pos;
 
   let vertex_moved = false;
   let new_vertex_pos =
@@ -168,19 +306,19 @@ function step(state, timestamp_ms) {
       mesh.vertices[state.selected_vertex_idx + 1],
     );
 
-  if (state.keys.move_left) {
+  if (state.keys.left) {
     new_vertex_pos[0] -= 0.1;
     vertex_moved = true;
   }
-  if (state.keys.move_right) {
+  if (state.keys.right) {
     new_vertex_pos[0] += 0.1;
     vertex_moved = true;
   }
-  if (state.keys.move_up) {
+  if (state.keys.up) {
     new_vertex_pos[1] += 0.1;
     vertex_moved = true;
   }
-  if (state.keys.move_down) {
+  if (state.keys.down) {
     new_vertex_pos[1] -= 0.1;
     vertex_moved = true;
   }
@@ -192,11 +330,17 @@ function step(state, timestamp_ms) {
     // TODO: Try not updating the buffer
     const gl_info = state.gl_info;
     const gl = gl_info.gl;
-    upload_buffer_segment(gl, gl_info.buffers.position, 0, new_vertex_pos);
+    upload_buffer_segment(gl, gl_info.buffers.position, state.selected_vertex_idx, new_vertex_pos);
   }
 
   // console.debug("Render: timestamp: %i - %i = %i", timestamp, start_time, elapsed);
   draw_scene(state);
+
+  // NOTE: Init the sidebar debug stats
+  const camera_pos_elem = document.getElementById("camera-pos");
+  camera_pos_elem.innerText = vec3.str(state.camera.pos);
+  const camera_dir_elem = document.getElementById("camera-dir");
+  camera_dir_elem.innerText = vec3.str(state.camera.dir);
 
   state.frame_count += 1;
 
@@ -257,7 +401,12 @@ function main() {
       gl: gl,
       program_info: program_info,
       buffers: buffers,
+      fov: (60 * Math.PI) / 180,
+      aspect_ratio: gl.canvas.clientWidth / gl.canvas.clientHeight,
+      z_near: 0.1,
+      z_far: 100.0,
     },
+    fixed_direction: true,
     keys: {
       left: false,
       right: false,
@@ -265,31 +414,50 @@ function main() {
       down: false,
       rotate_left: false,
       rotate_right: false,
+      move_forward: false,
+      move_backward: false,
       move_left: false,
-      move_up: false,
       move_right: false,
+      move_up: false,
       move_down: false,
     },
     mouse: {
       pos: vec2.create(),
       old_pos: vec2.create(),
-      pressed: false,
+      left_pressed: false,
+      right_pressed: false,
     },
+    view_to_projection: mat4.create(),
+    world_to_view: mat4.create(),
     camera: {
-      pos: vec3.fromValues(0.0, 0.0, -9.0),
-      dir: vec3.fromValues(0.0, 0.0, -1.0),
-      up:  vec3.fromValues(0.0, 1.0, 0.0),
+      pos: vec3.fromValues( 0.0, 0.0, -6.0),
+      dir: vec3.fromValues( 0.0, 0.0,  1.5),
+      up:  vec3.fromValues( 0.0, 1.0,  0.0),
       speed: 2.0,
     },
     mesh: mesh,
     selected_vertex_idx: 0,
   };
 
-  // NOTE: Init the sidebar debug stats
+  state.view_to_projection =
+    mat4.perspective(
+      mat4.create(),
+      state.gl_info.fov,
+      state.gl_info.aspect_ratio,
+      state.gl_info.z_near,
+      state.gl_info.z_far
+    );
+
+  const mode_form = document.getElementById("mode-form");
+  mode_form.onchange = (event) => {
+    console.debug("mode form change: %o", event);
+    state.mode = event.target.value;
+  };
+
   const mouse_pos_elem = document.getElementById("mouse-pos");
   mouse_pos_elem.innerText = vec2.str(state.mouse.pos);
   const mouse_pressed_elem = document.getElementById("mouse-pressed");
-  mouse_pressed_elem.innerText = state.mouse.pressed;
+  mouse_pressed_elem.innerText = state.mouse.left_pressed;
 
   console.log("Starting render with state: %o", state);
   //console.dir(canvas);
@@ -333,11 +501,11 @@ function main() {
         break;
       }
       case 83: { // s
-        state.keys.move_down = true;
+        state.keys.move_backward = true;
         break;
       }
       case 87: { // w
-        state.keys.move_up = true;
+        state.keys.move_forward = true;
         break;
       }
     }
@@ -380,17 +548,18 @@ function main() {
         break;
       }
       case 83: { // s
-        state.keys.move_down = false;
+        state.keys.move_backward = false;
         break;
       }
       case 87: { // w
-        state.keys.move_up = false;
+        state.keys.move_forward = false;
         break;
       }
     }
   };
 
   document.onwheel = (event) => {
+    console.debug("Mouse on wheel deltaY = %f", event.deltaY);
     state.camera.pos[2] += event.deltaY < 0 ? 1.0 : -1.0;
   };
 
@@ -402,13 +571,13 @@ function main() {
   };
 
   canvas.onmousedown = (event) => {
-    state.mouse.pressed = true;
+    state.mouse.left_pressed = true;
 
     mouse_pressed_elem.innerText = true;
   };
 
   canvas.onmouseup = (event) => {
-    state.mouse.pressed = false;
+    state.mouse.left_pressed = false;
 
     mouse_pressed_elem.innerText = false;
   };

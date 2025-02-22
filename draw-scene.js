@@ -60,13 +60,8 @@ function set_barycentric_attribute(gl, program_info, buffers) {
 }
 
 function draw_scene(state) {
-  const {
-    gl_info,
-    camera,
-    mesh
-  } = state;
-
-  const { gl, program_info, buffers } = gl_info;
+  const { gl_info, camera, mesh, } = state;
+  const { gl, program_info, buffers, } = gl_info;
 
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
   gl.clearDepth(1.0);
@@ -75,51 +70,18 @@ function draw_scene(state) {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  const fov = (45 * Math.PI) / 180;
-  const aspect_ratio = gl.canvas.clientWidth / gl.canvas.clientHeight;
-  const z_near = 0.1;
-  const z_far = 100.0;
-  const view_to_projection = mat4.create();
-
-  mat4.perspective(view_to_projection, fov, aspect_ratio, z_near, z_far);
-
   // NOTE: This is not uplading the buffer, only activating it for this frame.
   set_pos_attribute(gl, program_info, buffers);
   // set_color_attribute(gl, program_info, buffers);
   set_barycentric_attribute(gl, program_info, buffers);
 
-  const model_to_world = mat4.create();
-  const world_to_view = mat4.create();
-
-  mat4.rotateZ(
-    model_to_world,
-    model_to_world,
-    mesh.angle,
-  );
-
-  // Translate the model
-  mat4.translate(
-    model_to_world,
-    model_to_world,
-    [mesh.pos.x, 0.0, 0.0],
-  );
-
-  const fixed_direction = true;
-  if (fixed_direction) {
-    // Move the camera?
-    mat4.translate(
-      world_to_view,
-      world_to_view,
-      camera.pos,
-    );
-  } else {
-    mat4.lookAt(
-      world_to_view,
-      camera.pos,
-      camera.dir,
-      camera.up,
-    );
-  }
+  // if (state.fixed_direction) {
+  //   // Move the camera?
+  //   state.world_to_view = mat4.fromTranslation(mat4.create(), camera.pos,);
+  // } else {
+  //   state.world_to_view = mat4.lookAt( mat4.create(), camera.pos, camera.dir, camera.up,);
+  // }
+  state.world_to_view = mat4.lookAt(mat4.create(), camera.pos, camera.dir, camera.up,);
 
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.index);
 
@@ -128,19 +90,19 @@ function draw_scene(state) {
   gl.uniformMatrix4fv(
     program_info.uniform_locations.model_to_world,
     false,
-    model_to_world,
+    mesh.model_to_world,
   );
 
   gl.uniformMatrix4fv(
     program_info.uniform_locations.world_to_view,
     false,
-    world_to_view,
+    state.world_to_view,
   );
 
   gl.uniformMatrix4fv(
     program_info.uniform_locations.view_to_projection,
     false,
-    view_to_projection,
+    state.view_to_projection,
   );
 
   {
