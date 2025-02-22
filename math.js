@@ -1,6 +1,6 @@
 import { mat4, vec4, vec3 } from "gl-matrix";
 
-import { get_mesh_vertex } from "./mesh.js";
+import { get_mesh_vertex, find_mesh_plane_normal } from "./mesh.js";
 
 function find_ray_plane_time(camera_pos, mesh_pos, plane_normal, ray_dot_norm) {
   let result = 0.0;
@@ -60,7 +60,7 @@ function find_plane_normal(q, r, s) {
   return result;
 }
 
-function find_vertex_idx(state, mouse, epsilon = 1.0) {
+function find_vertex_idx(state, mouse, epsilon = 0.8) {
   let result = null;
 
   const mesh = state.mesh;
@@ -70,56 +70,46 @@ function find_vertex_idx(state, mouse, epsilon = 1.0) {
   // NOTE: World coorinates from here!
   const camera_pos = mat4.getTranslation(vec3.create(), state.world_to_view);
   const mesh_pos = mat4.getTranslation(vec3.create(), mesh.model_to_world);
+  const mesh_plane_normal = find_mesh_plane_normal(mesh);
 
+  console.debug("mesh normal: %s", vec3.str(mesh_plane_normal));
   console.debug("Origin %s with ray: %s", vec3.str(camera_pos), vec3.str(ray_world_norm));
 
-  // NOTE: Create a plane from our mesh. The first three points
-  const q = get_mesh_vertex(mesh.vertices, mesh_pos[2], 0);
-  const r = get_mesh_vertex(mesh.vertices, mesh_pos[2], 2);
-  const s = get_mesh_vertex(mesh.vertices, mesh_pos[2], 4);
-  const plane_normal = find_plane_normal(q, r, s);
-
-  const ray_dot_norm = vec3.dot(ray_world_norm, plane_normal);
+  const ray_dot_norm = vec3.dot(ray_world_norm, mesh_plane_normal);
 
   if (ray_dot_norm === 0) {
   } else {
-    const t = find_ray_plane_time(camera_pos, mesh_pos, plane_normal, ray_dot_norm);
+    const t = find_ray_plane_time(camera_pos, mesh_pos, mesh_plane_normal, ray_dot_norm);
 
     if (t < 0) {
       console.error("You're behind the plane dumbo! t = %f", t);
     } else {
       const ray_at_t = ray_cast(camera_pos, ray_world_norm, t);
 
-      console.debug(
-        "Ray(%f) = %s",
-        t,
-        vec3.str(ray_at_t),
-      );
+      //console.debug(
+      //  "Ray(%f) = %s",
+      //  t,
+      //  vec3.str(ray_at_t),
+      //);
 
       for (let idx = 0; idx < mesh.vertices.length; idx += 2) {
-        const vertex =
-        vec3.fromValues(
-          mesh.vertices[idx],
-          mesh.vertices[idx + 1],
-          0.0,
-        );
+        const vertex = get_mesh_vertex(mesh, idx);
+
         // Move the vertex into its position in the world
         const in_world = vec3.transformMat4(vec3.create(), vertex, mesh.model_to_world);
-        // Move vertex in the world infront of the camera
-        const in_view = vec3.transformMat4(vec3.create(), vertex, state.world_to_view);
         // Find the distance to the vertex in the mesh, and the vertex
         // where our mouse ray hit the mesh plane
         const distance = vec3.dist(in_world, ray_at_t);
 
-        console.debug(
-          "Vertex %s vs ray at t %s = %f",
-          vec3.str(in_world),
-          vec3.str(ray_at_t),
-          distance
-        );
-
         if (distance < epsilon) {
-          console.debug("New vertex is idx = %d", idx);
+          //console.debug(
+          //  "Vertex[%i] = %s vs ray at t = %f < %f",
+          //  idx,
+          //  vec3.str(in_world),
+          //  distance,
+          //  epsilon,
+          //);
+
           result = idx;
         }
       }
@@ -129,4 +119,4 @@ function find_vertex_idx(state, mouse, epsilon = 1.0) {
   return result;
 }
 
-export { find_vertex_idx };
+export { find_vertex_idx, find_plane_normal };

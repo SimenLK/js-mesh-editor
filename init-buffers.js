@@ -59,6 +59,7 @@ function upload_new_buffer_data(gl, buffer_index, data) {
 
 function upload_buffer_segment(gl, buffer_index, index, data) {
   console.assert(data instanceof Float32Array);
+  console.assert(data.length === 2);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer_index);
   gl.bufferSubData(gl.ARRAY_BUFFER, index * data.BYTES_PER_ELEMENT, data);

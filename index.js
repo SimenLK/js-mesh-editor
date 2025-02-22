@@ -3,9 +3,7 @@ import { mat4, vec4, vec3, vec2 } from "gl-matrix";
 import { init_buffers, upload_new_buffer_data, upload_buffer_segment } from "./init-buffers.js";
 import { draw_scene } from "./draw-scene.js";
 import { find_vertex_idx } from "./math.js";
-import { create_mesh } from "./mesh.js";
-
-console.log("Hello from js");
+import { create_mesh, get_mesh_vertex, get_mesh_vertex_v2, set_mesh_vertex } from "./mesh.js";
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -78,9 +76,9 @@ function step(state, timestamp_ms) {
     }
   }
 
-  if (mouse.left_pressed) {
-    switch (state.mode) {
-      case "pan": {
+  switch (state.mode) {
+    case "pan": {
+      if (mouse.left_pressed) {
         if (state.fixed_direction) {
           let delta = vec2.create();
           delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
@@ -100,22 +98,28 @@ function step(state, timestamp_ms) {
           const v3 = vec3.fromValues(delta[0], -delta[1], 0.0);
           camera.dir = vec3.add(vec3.create(), camera.dir, v3);
         }
-        break;
       }
+      break;
+    }
 
-      case "select": {
+    case "select": {
+      if (!state.selecting && mouse.left_pressed) {
+        state.selecting = true;
         const new_idx = find_vertex_idx(state, mouse);
 
-        if (new_idx) {
+        if (new_idx !== null) {
+          console.debug("New vertex is idx = %d", new_idx);
           state.selected_vertex_idx = new_idx;
         }
-
-        break;
+      } else if (!mouse.left_pressed) {
+        state.selecting = false;
       }
 
-      default: {
-        console.error("State in invalid mode: %s", state.mode);
-      }
+      break;
+    }
+
+    default: {
+      console.error("State in invalid mode: %s", state.mode);
     }
   }
 
@@ -138,21 +142,17 @@ function step(state, timestamp_ms) {
 
   if (state.keys.rotate_left) {
     const to_rotate = model_rotate_speed * elapsed_s;
-    state.model_to_world = mat4.rotateZ(mat4.create(), state.model_to_world, to_rotate);
+    mesh.model_to_world = mat4.rotateY(mat4.create(), mesh.model_to_world, to_rotate);
   }
   if (state.keys.rotate_right) {
     const to_rotate = model_rotate_speed * elapsed_s;
-    state.model_to_world = mat4.rotateZ(mat4.create(), state.model_to_world, -to_rotate);
+    mesh.model_to_world = mat4.rotateY(mat4.create(), mesh.model_to_world, -to_rotate);
   }
 
   state.mesh.world_pos = new_pos;
 
   let vertex_moved = false;
-  let new_vertex_pos =
-    vec2.fromValues(
-      mesh.vertices[state.selected_vertex_idx],
-      mesh.vertices[state.selected_vertex_idx + 1],
-    );
+  let new_vertex_pos = get_mesh_vertex_v2(mesh, state.selected_vertex_idx);
 
   if (state.keys.left) {
     new_vertex_pos[0] -= 0.1;
@@ -171,24 +171,34 @@ function step(state, timestamp_ms) {
     vertex_moved = true;
   }
 
-  mesh.vertices[state.selected_vertex_idx] = new_vertex_pos[0];
-  mesh.vertices[state.selected_vertex_idx + 1] = new_vertex_pos[1];
-
   if (vertex_moved) {
-    // TODO: Try not updating the buffer
     const gl_info = state.gl_info;
     const gl = gl_info.gl;
-    upload_buffer_segment(gl, gl_info.buffers.position, state.selected_vertex_idx, new_vertex_pos);
+
+    set_mesh_vertex(mesh, state.selected_vertex_idx, new_vertex_pos);
+
+    upload_buffer_segment(
+      gl,
+      gl_info.buffers.position,
+      state.selected_vertex_idx,
+      new_vertex_pos
+    );
   }
 
   // console.debug("Render: timestamp: %i - %i = %i", timestamp, start_time, elapsed);
   draw_scene(state);
 
-  // NOTE: Init the sidebar debug stats
+  // NOTE: Draw html ui
   const camera_pos_elem = document.getElementById("camera-pos");
   camera_pos_elem.innerText = vec3.str(state.camera.pos);
   const camera_dir_elem = document.getElementById("camera-dir");
   camera_dir_elem.innerText = vec3.str(state.camera.dir);
+
+  const vertex_idx_elem = document.getElementById("vertex-idx");
+  vertex_idx_elem.innerText = state.selected_vertex_idx;
+  const vertex_pos_elem = document.getElementById("vertex-pos");
+  const vertex = get_mesh_vertex(mesh, state.selected_vertex_idx);
+  vertex_pos_elem.innerText = vec3.str(vertex);
 
   state.frame_count += 1;
 
@@ -197,7 +207,10 @@ function step(state, timestamp_ms) {
 
 function main() {
   const canvas = document.getElementById("mesh-editor");
-  console.log("We found the canvas: %o", canvas);
+  console.log("We found the canvas:");
+
+  canvas.width = 1280;
+  canvas.height = 720;
 
   const gl = canvas.getContext("webgl2");
   if (!gl) {
@@ -285,6 +298,7 @@ function main() {
     },
     mesh: mesh,
     selected_vertex_idx: 0,
+    selecting: false,
   };
 
   state.view_to_projection =
