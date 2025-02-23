@@ -1,9 +1,10 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <title>Mesh editor</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    <title>Mesh editor</title>
+    <meta name="description" content="Trying to create an WebGL mesh editor. How does it behave when you want to move the vertices around and uploading directly to the GPU.">
 
     <link rel="stylesheet" href="style.css"/>
 
@@ -40,11 +41,17 @@
   </head>
 
   <body>
+    <header>
+      <h1>Mesh editor</h1>
+    </header>
+
     <main>
       <div class="sidebar">
-        <h1>Mesh editor</h1>
-        <p>Hello there. This is a test. We're testing whether this paragraph will wrap properly.</p>
         <p>The purpose of this app is to test whether we can create a WebGL mesh editor. How will it be to interact with the mesh, modifying it with mouse-dragging, node deletion, and subsequent re-uploading of the mesh to the GPU.</p>
+
+        <p>Currently, all that you can do is move the mesh model around. Or, you can move the camera. This is done in the "pan" mode. When you select "Select" mode, you can click on vertices, and the use the arrow keys to move the vertex around.</p>
+
+        <p>Moving the vertex will upload just the selected vertex back up to the GPU. Soon I will try to add easy save and uploading of meshes. Adding and removing points.</p>
 
         <form id="mode-form">
           <legend>Mode:</legend>
@@ -88,7 +95,7 @@
         </div>
 
         <div>
-          <code>Vertex:</code>
+          <code>Mesh:</code>
           <div style="padding-left: 15px;">
             <div>
               <code>Idx:</code>
@@ -96,7 +103,9 @@
             </div>
             <div>
               <code>Pos:</code>
-              <code id="vertex-pos"></code>
+              <code id="mesh-pos"></code>
+            </div>
+            <div id="mesh-vertices">
             </div>
           </div>
         </div>

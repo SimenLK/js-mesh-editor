@@ -9,6 +9,16 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function vec_to_str(vector) {
+  let result = [];
+
+  vector.forEach((v, idx) =>
+    result[idx] = v.toFixed(3)
+  );
+
+  return result;
+}
+
 function load_shader(gl, type, src) {
   const shader = gl.createShader(type);
 
@@ -50,6 +60,41 @@ function init_shader_program(gl, vertex_shader_src, fragment_shader_src) {
 }
 
 function calculate_barycentric(length) {
+}
+
+function ui_draw_mesh_vertices(mesh) {
+  const mesh_vertices_elem = document.getElementById("mesh-vertices");
+
+  mesh_vertices_elem.replaceChildren();
+
+  for (let i = 0; i < mesh.vertices.length; i += 2) {
+    const vertex = get_mesh_vertex_v2(mesh, i);
+    const x = vertex[0].toFixed(3);
+    const y = vertex[1].toFixed(3);
+
+    const new_elem = document.createElement("div");
+    new_elem.classList.add("vertex-container");
+
+    const vertex_code = document.createElement("code");
+    vertex_code.innerText = `vertex[${i}]:`;
+    vertex_code.classList.add("vertex-label");
+
+    const vector_code_container = document.createElement("div");
+    vector_code_container.classList.add("vertex-value");
+
+    const vector_code_x = document.createElement("code");
+    vector_code_x.innerText = `${x}`;
+    vector_code_container.appendChild(vector_code_x);
+
+    const vector_code_y = document.createElement("code");
+    vector_code_y.innerText = `${y}`;
+    vector_code_container.appendChild(vector_code_y);
+
+    new_elem.appendChild(vertex_code);
+    new_elem.appendChild(vector_code_container);
+
+    mesh_vertices_elem.appendChild(new_elem);
+  }
 }
 
 let fps_chart_elem = document.getElementById("fps-chart");
@@ -138,8 +183,6 @@ function step(state, timestamp_ms) {
 
   state.mouse.old_pos = state.mouse.pos;
 
-  let new_pos = mesh.world_pos;
-
   if (state.keys.rotate_left) {
     const to_rotate = model_rotate_speed * elapsed_s;
     mesh.model_to_world = mat4.rotateY(mat4.create(), mesh.model_to_world, to_rotate);
@@ -148,8 +191,6 @@ function step(state, timestamp_ms) {
     const to_rotate = model_rotate_speed * elapsed_s;
     mesh.model_to_world = mat4.rotateY(mat4.create(), mesh.model_to_world, -to_rotate);
   }
-
-  state.mesh.world_pos = new_pos;
 
   let vertex_moved = false;
   let new_vertex_pos = get_mesh_vertex_v2(mesh, state.selected_vertex_idx);
@@ -183,6 +224,8 @@ function step(state, timestamp_ms) {
       state.selected_vertex_idx,
       new_vertex_pos
     );
+
+    ui_draw_mesh_vertices(mesh);
   }
 
   // console.debug("Render: timestamp: %i - %i = %i", timestamp, start_time, elapsed);
@@ -190,15 +233,17 @@ function step(state, timestamp_ms) {
 
   // NOTE: Draw html ui
   const camera_pos_elem = document.getElementById("camera-pos");
-  camera_pos_elem.innerText = vec3.str(state.camera.pos);
+  const text = vec_to_str(state.camera.pos);
+  console.debug("pos is: %o", text);
+  camera_pos_elem.innerText = text;
   const camera_dir_elem = document.getElementById("camera-dir");
   camera_dir_elem.innerText = vec3.str(state.camera.dir);
 
   const vertex_idx_elem = document.getElementById("vertex-idx");
   vertex_idx_elem.innerText = state.selected_vertex_idx;
-  const vertex_pos_elem = document.getElementById("vertex-pos");
-  const vertex = get_mesh_vertex(mesh, state.selected_vertex_idx);
-  vertex_pos_elem.innerText = vec3.str(vertex);
+  const mesh_pos_elem = document.getElementById("mesh-pos");
+  const mesh_pos = mat4.getTranslation(vec3.create(), mesh.model_to_world);
+  mesh_pos_elem.innerText = vec3.str(mesh_pos);
 
   state.frame_count += 1;
 
@@ -320,6 +365,8 @@ function main() {
   mouse_pos_elem.innerText = vec2.str(state.mouse.pos);
   const mouse_pressed_elem = document.getElementById("mouse-pressed");
   mouse_pressed_elem.innerText = state.mouse.left_pressed;
+
+  ui_draw_mesh_vertices(mesh);
 
   console.log("Starting render with state: %o", state);
   //console.dir(canvas);

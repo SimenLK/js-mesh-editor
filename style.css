@@ -27,4 +27,24 @@ canvas {
   display: flex;
 }
 
+.vertex-container {
+  display: flex;
+  gap: 2ch;
+}
+
+.vertex-label {
+  flex-basis: 15ch;
+}
+
+.vertex-value {
+  display: flex;
+  gap: 2ch;
+  flex-grow: 1;
+}
+
+.vertex-value > code {
+  flex-basis: 15ch;
+  text-align: right;
+}
+
 /* vim: set et ts=2 sw=2 */
