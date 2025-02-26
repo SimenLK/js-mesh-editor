@@ -81,7 +81,13 @@ function draw_scene(state) {
   // } else {
   //   state.world_to_view = mat4.lookAt( mat4.create(), camera.pos, camera.dir, camera.up,);
   // }
-  state.world_to_view = mat4.lookAt(mat4.create(), camera.pos, camera.dir, camera.up,);
+  state.world_to_view =
+    mat4.lookAt(
+      mat4.create(),
+      camera.pos,
+      vec3.add(vec3.create(), camera.pos, camera.dir),
+      camera.up
+    );
 
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.index);
 

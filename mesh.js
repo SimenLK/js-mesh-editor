@@ -12,7 +12,7 @@ function get_mesh_vertex(mesh, idx) {
     vec3.fromValues(
       mesh.vertices[idx],
       mesh.vertices[idx + 1],
-      mesh_pos[2]
+      0.0,
     );
 
   return result;
@@ -85,10 +85,12 @@ function create_mesh() {
     1, 0, 0,
     0, 0, 1,
   ];
+  const pos = vec3.fromValues(0.0,  0.0, -5.0);
+  const model_to_world = mat4.fromTranslation(mat4.create(), pos);
   const mesh = {
-    model_to_world: mat4.fromTranslation(mat4.create(), vec3.fromValues(0.0, 0.0, 0.0)),
+    model_to_world: model_to_world,
     // y axis rotation in radians?
-    angle: Math.PI,
+    angle: 0.0,
     // A triangle
     vertices: vertices,
     barycentric: barycentric,

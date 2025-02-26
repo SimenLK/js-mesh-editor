@@ -1,8 +1,8 @@
-import { mat4, vec4, vec3, vec2 } from "gl-matrix";
+import { mat4, mat3, vec4, vec3, vec2 } from "gl-matrix";
 
 import { init_buffers, upload_new_buffer_data, upload_buffer_segment } from "./init-buffers.js";
 import { draw_scene } from "./draw-scene.js";
-import { find_vertex_idx } from "./math.js";
+import { to_radian, find_vertex_idx } from "./math.js";
 import { create_mesh, get_mesh_vertex, get_mesh_vertex_v2, set_mesh_vertex } from "./mesh.js";
 
 function sleep(ms) {
@@ -125,17 +125,16 @@ function step(state, timestamp_ms) {
     case "pan": {
       if (mouse.left_pressed) {
         if (state.fixed_direction) {
-          let delta = vec2.create();
-          delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
-          // TODO: Optional sensitivity on the scale here?
-          delta = vec2.scale(vec2.create(), delta, 0.02);
+          const rotation_factor = 0.1;
+          let delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
+          const delta_x = to_radian(delta[0] * rotation_factor);
 
-          // TODO: I don't know why I have to flip the y here
-          const v3 = vec3.fromValues(delta[0], -delta[1], 0.0);
-          camera.pos = vec3.add(vec3.create(), camera.pos, v3);
+          let rotation_matrix = mat4.fromRotation(mat4.create(), delta_x, camera.up);
+          rotation_matrix = mat3.fromMat4(mat3.create(), rotation_matrix);
+
+          camera.dir = vec3.transformMat3(vec3.create(), camera.dir, rotation_matrix);
         } else {
-          let delta = vec2.create();
-          delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
+          let delta = vec2.subtract(vec2.create(), mouse.pos, mouse.old_pos);
           // TODO: Optional sensitivity on the scale here?
           delta = vec2.scale(vec2.create(), delta, 0.02);
 
@@ -169,16 +168,22 @@ function step(state, timestamp_ms) {
   }
 
   if (state.keys.move_left) {
-    camera.pos[0] -= camera.speed * elapsed_s;
+    const strafe_dir = vec3.cross(vec3.create(), camera.dir, camera.up);
+    const new_pos = vec3.scale(vec3.create(), strafe_dir, -0.1);
+    camera.pos = vec3.add(vec3.create(), camera.pos, new_pos);
   }
   if (state.keys.move_forward) {
-    camera.pos[2] += camera.speed * elapsed_s;
+    const new_pos = vec3.scale(vec3.create(), camera.dir, 0.1);
+    camera.pos = vec3.add(vec3.create(), camera.pos, new_pos);
   }
   if (state.keys.move_right) {
-    camera.pos[0] += camera.speed * elapsed_s;
+    const strafe_dir = vec3.cross(vec3.create(), camera.dir, camera.up);
+    const new_pos = vec3.scale(vec3.create(), strafe_dir, 0.1);
+    camera.pos = vec3.add(vec3.create(), camera.pos, new_pos);
   }
   if (state.keys.move_backward) {
-    camera.pos[2] -= camera.speed * elapsed_s;
+    const new_pos = vec3.scale(vec3.create(), camera.dir, -0.1);
+    camera.pos = vec3.add(vec3.create(), camera.pos, new_pos);
   }
 
   state.mouse.old_pos = state.mouse.pos;
@@ -232,12 +237,12 @@ function step(state, timestamp_ms) {
   draw_scene(state);
 
   // NOTE: Draw html ui
+  // TODO: This happens every frame
   const camera_pos_elem = document.getElementById("camera-pos");
   const text = vec_to_str(state.camera.pos);
-  console.debug("pos is: %o", text);
   camera_pos_elem.innerText = text;
   const camera_dir_elem = document.getElementById("camera-dir");
-  camera_dir_elem.innerText = vec3.str(state.camera.dir);
+  camera_dir_elem.innerText = vec_to_str(state.camera.dir);
 
   const vertex_idx_elem = document.getElementById("vertex-idx");
   vertex_idx_elem.innerText = state.selected_vertex_idx;
@@ -336,8 +341,8 @@ function main() {
     view_to_projection: mat4.create(),
     world_to_view: mat4.create(),
     camera: {
-      pos: vec3.fromValues( 0.0, 0.0, -6.0),
-      dir: vec3.fromValues( 0.0, 0.0,  1.5),
+      pos: vec3.fromValues( 0.0, 0.0,  0.0),
+      dir: vec3.fromValues( 0.0, 0.0, -1.0),
       up:  vec3.fromValues( 0.0, 1.0,  0.0),
       speed: 2.0,
     },
