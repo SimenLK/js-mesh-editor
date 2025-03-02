@@ -20,25 +20,6 @@ function set_pos_attribute(gl, program_info, buffers) {
   gl.enableVertexAttribArray(program_info.attrib_locations.vertex_pos);
 }
 
-function set_color_attribute(gl, program_info, buffers) {
-  const num_components = 4;
-  const type = gl.FLOAT;
-  const normalize = false;
-  const stride = 0;
-  const offset = 0;
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
-  gl.vertexAttribPointer(
-    program_info.attrib_locations.vertex_color,
-    num_components,
-    type,
-    normalize,
-    stride,
-    offset,
-  );
-  gl.enableVertexAttribArray(program_info.attrib_locations.vertex_color);
-}
-
 function set_barycentric_attribute(gl, program_info, buffers) {
   const num_components = 3;
   const type = gl.FLOAT;
@@ -89,7 +70,9 @@ function draw_scene(state) {
       camera.up
     );
 
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.index);
+  if (state.indexed) {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.index);
+  }
 
   gl.useProgram(program_info.program);
 
@@ -111,11 +94,14 @@ function draw_scene(state) {
     state.view_to_projection,
   );
 
-  {
+  if (state.indexed) {
     const vertex_count = mesh.indices.length;
     const type = gl.UNSIGNED_SHORT;
     const offset = 0;
     gl.drawElements(gl.TRIANGLES, vertex_count, type, offset);
+  } else {
+    const vertex_count = mesh.indices.length;
+    gl.drawArrays(gl.TRIANGLES, 0, vertex_count);
   }
 }
 

@@ -6,8 +6,6 @@ function get_mesh_vertex(mesh, idx) {
   console.assert(idx < mesh.vertices.length);
   console.assert(idx + 1 <= mesh.vertices.length);
 
-  const mesh_pos = mat4.getTranslation(vec3.create(), mesh.model_to_world);
-
   const result =
     vec3.fromValues(
       mesh.vertices[idx],
@@ -54,6 +52,69 @@ function find_mesh_plane_normal(mesh) {
   result = find_plane_normal(q, r, s);
 
   return result;
+}
+
+function get_vertex(vertices, idx) {
+  const w = 2;
+
+  return [
+    vertices[0 + w * idx],
+    vertices[1 + w * idx],
+  ];
+}
+
+function unindex_vertices(vertices, indices) {
+  const length = indices.length * 2;
+  let result = Array(length).fill(0, 0, length);
+
+  let result_idx = 0;
+  for (let i = 0; i < indices.length; i += 3) {
+    const i0 = indices[i];
+    const i1 = indices[i + 1];
+    const i2 = indices[i + 2];
+    const v0 = get_vertex(vertices, i0);
+    const v1 = get_vertex(vertices, i1);
+    const v2 = get_vertex(vertices, i2);
+
+    result[result_idx + 0] = v0[0];
+    result[result_idx + 1] = v0[1];
+    result[result_idx + 2] = v1[0];
+    result[result_idx + 3] = v1[1];
+    result[result_idx + 4] = v2[0];
+    result[result_idx + 5] = v2[1];
+
+    result_idx += 6;
+  }
+
+  return result;
+}
+
+function calculate_barycentric(length) {
+  let result = [];
+
+  const count = length / 3;
+
+  console.debug("Barycentric count: %i", count);
+
+  for (let i = 0; i < count; i += 1) {
+    const even = i % 2 === 0;
+
+    if (even) {
+      result.push(
+        0, 0, 1,
+        0, 1, 0,
+        1, 0, 0,
+      );
+    } else {
+      result.push(
+        0, 0, 1,
+        1, 0, 0,
+        0, 1, 0,
+      );
+    }
+  }
+
+  return new Float32Array(result);
 }
 
 function parse_mesh_file(text) {
@@ -112,14 +173,23 @@ function parse_mesh_file(text) {
 
       console.debug("[Mesh] Indices: %o", indices);
 
+      console.time("unindex")
+      const unindexed_vertices = unindex_vertices(vertices, indices);
+      console.timeEnd("unindex")
+
+      console.time("barycentric")
+      const barycentric = calculate_barycentric(indices.length);
+      console.timeEnd("barycentric")
+      console.debug("[Mesh] Barycentric: %o", barycentric);
+
       const pos = vec3.fromValues(0.0,  0.0, -5.0);
 
       mesh = {
         model_to_world: mat4.fromTranslation(mat4.create(), pos),
         // NOTE: y axis rotation in radians
         angle: 0.0,
-        vertices: new Float32Array(vertices),
-        barycentric: [],
+        vertices: new Float32Array(unindexed_vertices),
+        barycentric: barycentric,
         indices: new Uint16Array(indices),
       };
     }
@@ -128,44 +198,41 @@ function parse_mesh_file(text) {
   return mesh;
 }
 
-function create_mesh() {
+function create_mesh(indexed) {
   const vertices = new Float32Array([
-     0.0,  1.0,
     -1.0, -1.0,
-     0.0,  0.0,
-     2.0,  1.0,
-     3.0, -1.0,
-     4.0, -1.0,
-     3.0, -2.0,
+     0.0,  1.0,
+     1.0,  0.0,
+     2.0, -1.0,
+     // 3.0, -1.0,
+     // 4.0, -1.0,
+     // 3.0, -2.0,
   ]);
   const indices = [
     0, 1, 2,
     0, 2, 3,
-    2, 3, 4,
-    4, 5, 3,
-    4, 6, 2,
-    5, 6, 4,
-  ];
-  //const barycentric = calculate_barycentric(vertices.length);
-  const barycentric = [
-    0, 1, 0,
-    0, 0, 1,
-    1, 0, 0,
-    0, 0, 1,
-    0, 1, 0,
-    1, 0, 0,
-    0, 0, 1,
+    // 2, 3, 4,
+    // 4, 5, 3,
+    // 4, 6, 2,
+    // 5, 6, 4,
   ];
   const pos = vec3.fromValues(0.0,  0.0, -5.0);
   const model_to_world = mat4.fromTranslation(mat4.create(), pos);
-  const num_barycentric = (0.5 * vertices.length) * 3;
+
+  const unindexed_vertices = unindex_vertices(vertices, indices);
+  console.debug("[Mesh] Unindexed vertices: %o", unindexed_vertices);
+
+  console.debug("[Mesh] Calculating barycentric coordinates");
+  const barycentric = calculate_barycentric(indices.length);
+  console.debug("[Mesh] Calculating barycentric coordinates ... Complete");
+
   const mesh = {
     model_to_world: model_to_world,
     // y axis rotation in radians?
     angle: 0.0,
     // A triangle
-    vertices: vertices,
-    barycentric: Array(num_barycentric).fill(0, 0, num_barycentric), // barycentric,
+    vertices: indexed ? vertices : unindexed_vertices,
+    barycentric: barycentric,
     indices: indices,
     colors: [
       1.0, 0.0, 0.0, 1.0, // red

@@ -69,46 +69,66 @@ function init_shader_program(gl) {
   return program;
 }
 
-// function calculate_barycentric(length) {
-// }
+function get_vertex(vertices, idx) {
+  const w = 2;
+
+  return [
+    vertices[0 + w * idx],
+    vertices[1 + w * idx],
+  ];
+}
 
 function ui_draw_mesh_vertices(mesh) {
+  const vertices = mesh.vertices;
+  const indices = mesh.indices;
   const mesh_vertices_elem = document.getElementById("mesh-vertices");
 
   mesh_vertices_elem.replaceChildren();
 
-  for (let i = 0; i < mesh.vertices.length; i += 2) {
-    const vertex = get_mesh_vertex_v2(mesh, i);
-    const x = vertex[0].toFixed(3);
-    const y = vertex[1].toFixed(3);
+  let elem = 0;
+  for (let i = 0; i < mesh.indices.length; i += 3) {
+    const i0 = indices[i];
+    const i1 = indices[i + 1];
+    const i2 = indices[i + 2];
+    const v0 = get_vertex(vertices, i0);
+    const v1 = get_vertex(vertices, i1);
+    const v2 = get_vertex(vertices, i2);
 
     const new_elem = document.createElement("div");
     new_elem.classList.add("vertex-container");
 
     const vertex_code = document.createElement("code");
-    vertex_code.innerText = `vertex[${i}]:`;
+    vertex_code.innerText = `elem[${elem}]:`;
     vertex_code.classList.add("vertex-label");
 
     const vector_code_container = document.createElement("div");
     vector_code_container.classList.add("vertex-value");
 
-    const vector_code_x = document.createElement("code");
-    vector_code_x.innerText = `${x}`;
-    vector_code_container.appendChild(vector_code_x);
+    const v0_elem = document.createElement("code");
+    v0_elem.innerText = `v[${i0}]: ` + vec_to_str(v0);
+    vector_code_container.appendChild(v0_elem);
 
-    const vector_code_y = document.createElement("code");
-    vector_code_y.innerText = `${y}`;
-    vector_code_container.appendChild(vector_code_y);
+    const v1_elem = document.createElement("code");
+    v1_elem.innerText = `v[${i1}]: ` + vec_to_str(v1);
+    vector_code_container.appendChild(v1_elem);
+
+    const v2_elem = document.createElement("code");
+    v2_elem.innerText = `v[${i2}]: ` + vec_to_str(v2);
+    vector_code_container.appendChild(v2_elem);
 
     new_elem.appendChild(vertex_code);
     new_elem.appendChild(vector_code_container);
 
     mesh_vertices_elem.appendChild(new_elem);
+
+    elem += 1;
   }
 }
 
 function read_file(state, file) {
   console.assert(file instanceof File);
+
+  console.time("load-mesh");
 
   const reader = new FileReader();
 
@@ -117,9 +137,7 @@ function read_file(state, file) {
     const text = reader.result;
 
     const mesh = parse_mesh_file(text);
-
     if (mesh) {
-      // TODO: Upload the new data to the GPU
       const info = state.gl_info;
       const gl = info.gl;
 
@@ -128,20 +146,20 @@ function read_file(state, file) {
       gl.bufferData(gl.ARRAY_BUFFER, mesh.vertices, gl.DYNAMIC_DRAW);
 
       // Upload indices
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, info.buffers.index);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
+      if (state.indexed) {
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, info.buffers.index);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
+      }
 
       // Upload barycentric coordinated
-      const num_barycentric = (0.5 * mesh.vertices.length) * 3;
-      const barycentric = Array(num_barycentric).fill(0, 0, num_barycentric);
       gl.bindBuffer(gl.ARRAY_BUFFER, info.buffers.barycentric);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(barycentric), gl.STATIC_DRAW);
-      mesh.barycentric = barycentric;
+      gl.bufferData(gl.ARRAY_BUFFER, mesh.barycentric, gl.STATIC_DRAW);
 
-      ui_draw_mesh_vertices(mesh);
+      // ui_draw_mesh_vertices(mesh);
 
-      state.camera.pos = vec3.fromValues(30319.5717, 6454318.44, 0.0);
+      state.camera.pos = vec3.fromValues(20319.5717, 6454318.44, 500.0);
 
+      console.timeEnd("load-mesh");
       state.mesh = mesh;
     }
   };
@@ -210,11 +228,13 @@ function step(state, timestamp_ms) {
     case "select": {
       if (!state.selecting && mouse.left_pressed) {
         state.selecting = true;
-        const new_idx = find_vertex_idx(state, mouse);
+        console.time("select-vertex");
+        const new_indices = find_vertex_idx(state, mouse, 10.0);
+        console.timeEnd("select-vertex");
 
-        if (new_idx !== null) {
-          console.debug("New vertex is idx = %d", new_idx);
-          state.selected_vertex_idx = new_idx;
+        if (new_indices.length > 0) {
+          console.debug("New vertex is idx = %o", new_indices);
+          state.selected_vertex_idx = new_indices;
 
           vertex_idx_elem.innerText = state.selected_vertex_idx;
         }
@@ -271,22 +291,37 @@ function step(state, timestamp_ms) {
   }
 
   let vertex_moved = false;
-  let new_vertex_pos = get_mesh_vertex_v2(mesh, state.selected_vertex_idx);
+  let new_vertex_positions =
+    state.selected_vertex_idx.map((idx) =>
+      [idx, get_mesh_vertex_v2(mesh, idx)]
+    );
 
   if (state.keys.left) {
-    new_vertex_pos[0] -= 0.1;
+    new_vertex_positions.forEach((entry) => {
+      const pos = entry[1];
+      pos[0] -= 10.1;
+    });
     vertex_moved = true;
   }
   if (state.keys.right) {
-    new_vertex_pos[0] += 0.1;
+    new_vertex_positions.forEach((entry) => {
+      const pos = entry[1];
+      pos[0] += 10.1;
+    });
     vertex_moved = true;
   }
   if (state.keys.up) {
-    new_vertex_pos[1] += 0.1;
+    new_vertex_positions.forEach((entry) => {
+      const pos = entry[1];
+      pos[1] += 10.1;
+    });
     vertex_moved = true;
   }
   if (state.keys.down) {
-    new_vertex_pos[1] -= 0.1;
+    new_vertex_positions.forEach((entry) => {
+      const pos = entry[1];
+      pos[1] -= 10.1;
+    });
     vertex_moved = true;
   }
 
@@ -294,16 +329,23 @@ function step(state, timestamp_ms) {
     const gl_info = state.gl_info;
     const gl = gl_info.gl;
 
-    set_mesh_vertex(mesh, state.selected_vertex_idx, new_vertex_pos);
+    new_vertex_positions.forEach((entry) => {
+      const idx = entry[0];
+      const new_pos = entry[1];
+      console.time("move-vertex");
+      set_mesh_vertex(mesh, idx, new_pos);
 
-    upload_buffer_segment(
-      gl,
-      gl_info.buffers.position,
-      state.selected_vertex_idx,
-      new_vertex_pos
-    );
+      upload_buffer_segment(
+        gl,
+        gl_info.buffers.position,
+        idx,
+        new_pos,
+      );
 
-    ui_draw_mesh_vertices(mesh);
+      console.timeEnd("move-vertex");
+    });
+
+    // ui_draw_mesh_vertices(mesh);
   }
 
   // console.debug("Render: timestamp: %i - %i = %i", timestamp, start_time, elapsed);
@@ -312,26 +354,6 @@ function step(state, timestamp_ms) {
   state.frame_count += 1;
 
   requestAnimationFrame((t) => step(state, t));
-}
-
-function read_file(state, file) {
-  console.assert(file instanceof File);
-
-  const reader = new FileReader();
-
-  // TODO: Handle errors
-  reader.onload = () => {
-    const text = reader.result;
-
-    const mesh = parse_mesh_file(text);
-
-    if (mesh) {
-      state.mesh = mesh;
-      // TODO: Upload the new data to the GPU
-    }
-  };
-
-  reader.readAsText(file);
 }
 
 function main() {
@@ -368,7 +390,9 @@ function main() {
     },
   };
 
-  const mesh = create_mesh();
+  const indexed = false;
+
+  const mesh = create_mesh(indexed);
 
   const buffers = init_buffers(gl, mesh.vertices, mesh.colors, mesh.indices, mesh.barycentric);
 
@@ -379,16 +403,17 @@ function main() {
     // - "pan": moving the model and scene around
     // - "select": selcting vertices to edit them
     mode: "pan",
+    fixed_direction: true,
+    indexed: indexed,
     gl_info: {
       gl: gl,
       program_info: program_info,
       buffers: buffers,
-      fov: (60 * Math.PI) / 180,
+      fov: (90 * Math.PI) / 180,
       aspect_ratio: gl.canvas.clientWidth / gl.canvas.clientHeight,
       z_near: 0.1,
-      z_far: 100.0,
+      z_far: 2000.0,
     },
-    fixed_direction: true,
     keys: {
       left: false,
       right: false,
@@ -412,13 +437,13 @@ function main() {
     view_to_projection: mat4.create(),
     world_to_view: mat4.create(),
     camera: {
-      pos: vec3.fromValues( 0.0, 0.0,  0.0),
-      dir: vec3.fromValues( 0.0, 0.0, -1.0),
-      up:  vec3.fromValues( 0.0, 1.0,  0.0),
+      pos: vec3.fromValues(0.0, 0.0, 0.0),
+      dir: vec3.fromValues(0.0, 0.0, -1.0),
+      up: vec3.fromValues(0.0, 1.0, 0.0),
       speed: 2.0,
     },
     mesh: mesh,
-    selected_vertex_idx: 0,
+    selected_vertex_idx: [],
     selecting: false,
   };
 
@@ -446,11 +471,11 @@ function main() {
 
   console.log("Starting render with state: %o", state);
   //console.dir(canvas);
-  console.debug("canvas type: %s", typeof(canvas));
+  console.debug("canvas type: %s", typeof (canvas));
   console.debug("state.buffers.index is Float32Array?: %o", state.gl_info.buffers.index instanceof Float32Array);
 
   document.onkeydown = (event) => {
-     //console.debug("key down: %s => %i", event.key, event.keyCode);
+    //console.debug("key down: %s => %i", event.key, event.keyCode);
     switch (event.keyCode) {
       case 37: {
         state.keys.left = true;
@@ -544,8 +569,9 @@ function main() {
   };
 
   document.onwheel = (event) => {
-    console.debug("Mouse on wheel deltaY = %f", event.deltaY);
+    // console.debug("Mouse on wheel deltaY = %f", event.deltaY);
     state.camera.pos[2] += event.deltaY < 0 ? 1.0 : -1.0;
+    camera_pos_elem.innerText = vec_to_str(state.camera.pos);
   };
 
   canvas.ondragover = (ev) => {

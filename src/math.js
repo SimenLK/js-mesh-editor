@@ -70,7 +70,7 @@ function find_plane_normal(q, r, s) {
 }
 
 function find_vertex_idx(state, mouse, epsilon = 0.3) {
-  let result = null;
+  let result = [];
 
   const mesh = state.mesh;
 
@@ -109,6 +109,7 @@ function find_vertex_idx(state, mouse, epsilon = 0.3) {
         ray_at_t[2].toFixed(3),
       );
 
+      // TODO: Need to make this search faster for big grids
       for (let idx = 0; idx < mesh.vertices.length; idx += 2) {
         const vertex = get_mesh_vertex(mesh, idx);
 
@@ -118,18 +119,18 @@ function find_vertex_idx(state, mouse, epsilon = 0.3) {
         // where our mouse ray hit the mesh plane
         const distance = vec3.dist(ray_at_t, in_world);
 
-        console.debug(
-          "Vertex[%i] = (%f, %f, %f) vs ray at t = %f < %f",
-          idx,
-          in_world[0].toFixed(3),
-          in_world[1].toFixed(3),
-          in_world[2].toFixed(3),
-          distance,
-          epsilon,
-        );
-
         if (distance < epsilon) {
-          result = idx;
+          console.debug(
+            "Vertex[%i] = (%f, %f, %f) vs ray at t = %f < %f",
+            idx,
+            in_world[0].toFixed(3),
+            in_world[1].toFixed(3),
+            in_world[2].toFixed(3),
+            distance,
+            epsilon,
+          );
+
+          result.push(idx);
         }
       }
     }

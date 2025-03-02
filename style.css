@@ -11,10 +11,9 @@ canvas {
 }
 
 .sidebar {
-  flex-basis: 60ch;
+  flex-basis: 50ch;
   padding: 20px;
   border-right: 1px black solid;
-  max-width: 80ch;
 }
 
 .canvas-container {
@@ -28,8 +27,9 @@ canvas {
 }
 
 .mesh-vertices {
-  max-height: 400px;
-  overflow-y: scroll;
+  max-height: 200px;
+  max-width: 80ch;
+  overflow: scroll;
 }
 
 .vertex-container {
@@ -50,6 +50,7 @@ canvas {
 .vertex-value > code {
   flex-basis: 15ch;
   text-align: right;
+  text-wrap: nowrap;
 }
 
 /* vim: set et ts=2 sw=2 */
