@@ -1,4 +1,4 @@
-import { mat4, mat3, vec4, vec3, vec2 } from "gl-matrix";
+import { mat4, mat3, vec3, vec2 } from "gl-matrix";
 
 import { init_buffers, upload_new_buffer_data, upload_buffer_segment } from "./init-buffers.js";
 import { draw_scene } from "./draw-scene.js";
@@ -39,9 +39,14 @@ function load_shader(gl, type, src) {
   return shader;
 }
 
-function init_shader_program(gl, vertex_shader_src, fragment_shader_src) {
-  const vertex_shader = load_shader(gl, gl.VERTEX_SHADER, vertex_shader_src);
-  const fragment_shader = load_shader(gl, gl.FRAGMENT_SHADER, fragment_shader_src);
+function init_shader_program(gl) {
+  const vertex_shader_elem = document.getElementById("vertex-shader");
+  const fragment_shader_elem = document.getElementById("fragment-shader");
+
+  console.log("Vertex shader:\n%s", vertex_shader_elem.innerText);
+
+  const vertex_shader = load_shader(gl, gl.VERTEX_SHADER, vertex_shader_elem.innerText);
+  const fragment_shader = load_shader(gl, gl.FRAGMENT_SHADER, fragment_shader_elem.innerText);
 
   const program = gl.createProgram();
   gl.attachShader(program, vertex_shader);
@@ -56,11 +61,16 @@ function init_shader_program(gl, vertex_shader_src, fragment_shader_src) {
     return null;
   }
 
+  // NOTE: The shaders has been succesfully linked to the program, so we do not
+  // need these anymore
+  gl.deleteShader(vertex_shader);
+  gl.deleteShader(fragment_shader);
+
   return program;
 }
 
-function calculate_barycentric(length) {
-}
+// function calculate_barycentric(length) {
+// }
 
 function ui_draw_mesh_vertices(mesh) {
   const mesh_vertices_elem = document.getElementById("mesh-vertices");
@@ -270,17 +280,8 @@ function main() {
 
   console.info("Got ctx: %o", gl);
 
-  const vertex_shader_elem = document.getElementById("vertex-shader");
-  const fragment_shader_elem = document.getElementById("fragment-shader");
-
-  console.log("Vertex shader:\n%s", vertex_shader_elem.innerText);
-
-  const shader_program =
-    init_shader_program(
-      gl,
-      vertex_shader_elem.innerText,
-      fragment_shader_elem.innerText
-    );
+  // TODO: Does the program belong to the mesh?
+  const shader_program = init_shader_program(gl);
 
   // TODO: Only the program info?
   const program_info = {
@@ -291,6 +292,7 @@ function main() {
       vertex_barycentric: gl.getAttribLocation(shader_program, "a_barycentric"),
     },
     uniform_locations: {
+      // TODO: As this model_to_world uniform is unique to every model
       model_to_world: gl.getUniformLocation(shader_program, "u_model_to_world"),
       world_to_view: gl.getUniformLocation(shader_program, "u_world_to_view"),
       view_to_projection: gl.getUniformLocation(shader_program, "u_view_to_projection"),
