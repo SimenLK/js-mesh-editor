@@ -1,9 +1,9 @@
 import { mat4, mat3, vec3, vec2 } from "gl-matrix";
 
-import { init_buffers, upload_new_buffer_data, upload_buffer_segment } from "./init-buffers.js";
+import { init_buffers, upload_buffer_segment } from "./init-buffers.js";
 import { draw_scene } from "./draw-scene.js";
 import { to_radian, find_vertex_idx } from "./math.js";
-import { create_mesh, get_mesh_vertex, get_mesh_vertex_v2, set_mesh_vertex } from "./mesh.js";
+import { create_mesh, get_mesh_vertex_v2, parse_mesh_file, set_mesh_vertex } from "./mesh.js";
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -107,7 +107,55 @@ function ui_draw_mesh_vertices(mesh) {
   }
 }
 
+function read_file(state, file) {
+  console.assert(file instanceof File);
+
+  const reader = new FileReader();
+
+  // TODO: Handle errors
+  reader.onload = () => {
+    const text = reader.result;
+
+    const mesh = parse_mesh_file(text);
+
+    if (mesh) {
+      // TODO: Upload the new data to the GPU
+      const info = state.gl_info;
+      const gl = info.gl;
+
+      // Upload vertices
+      gl.bindBuffer(gl.ARRAY_BUFFER, info.buffers.position);
+      gl.bufferData(gl.ARRAY_BUFFER, mesh.vertices, gl.DYNAMIC_DRAW);
+
+      // Upload indices
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, info.buffers.index);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
+
+      // Upload barycentric coordinated
+      const num_barycentric = (0.5 * mesh.vertices.length) * 3;
+      const barycentric = Array(num_barycentric).fill(0, 0, num_barycentric);
+      gl.bindBuffer(gl.ARRAY_BUFFER, info.buffers.barycentric);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(barycentric), gl.STATIC_DRAW);
+      mesh.barycentric = barycentric;
+
+      ui_draw_mesh_vertices(mesh);
+
+      state.camera.pos = vec3.fromValues(30319.5717, 6454318.44, 0.0);
+
+      state.mesh = mesh;
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+
 let fps_chart_elem = document.getElementById("fps-chart");
+const camera_pos_elem = document.getElementById("camera-pos");
+const camera_dir_elem = document.getElementById("camera-dir");
+const vertex_idx_elem = document.getElementById("vertex-idx");
+const mesh_pos_elem = document.getElementById("mesh-pos");
+
 let times = [];
 let start_time_s;
 
@@ -151,7 +199,10 @@ function step(state, timestamp_ms) {
           // TODO: I don't know why I have to flip the y here
           const v3 = vec3.fromValues(delta[0], -delta[1], 0.0);
           camera.dir = vec3.add(vec3.create(), camera.dir, v3);
+
         }
+
+        camera_dir_elem.innerText = vec_to_str(state.camera.dir);
       }
       break;
     }
@@ -164,6 +215,8 @@ function step(state, timestamp_ms) {
         if (new_idx !== null) {
           console.debug("New vertex is idx = %d", new_idx);
           state.selected_vertex_idx = new_idx;
+
+          vertex_idx_elem.innerText = state.selected_vertex_idx;
         }
       } else if (!mouse.left_pressed) {
         state.selecting = false;
@@ -181,19 +234,23 @@ function step(state, timestamp_ms) {
     const strafe_dir = vec3.cross(vec3.create(), camera.dir, camera.up);
     const new_pos = vec3.scale(vec3.create(), strafe_dir, -0.1);
     camera.pos = vec3.add(vec3.create(), camera.pos, new_pos);
+    camera_pos_elem.innerText = vec_to_str(state.camera.pos);
   }
   if (state.keys.move_forward) {
     const new_pos = vec3.scale(vec3.create(), camera.dir, 0.1);
     camera.pos = vec3.add(vec3.create(), camera.pos, new_pos);
+    camera_pos_elem.innerText = vec_to_str(state.camera.pos);
   }
   if (state.keys.move_right) {
     const strafe_dir = vec3.cross(vec3.create(), camera.dir, camera.up);
     const new_pos = vec3.scale(vec3.create(), strafe_dir, 0.1);
     camera.pos = vec3.add(vec3.create(), camera.pos, new_pos);
+    camera_pos_elem.innerText = vec_to_str(state.camera.pos);
   }
   if (state.keys.move_backward) {
     const new_pos = vec3.scale(vec3.create(), camera.dir, -0.1);
     camera.pos = vec3.add(vec3.create(), camera.pos, new_pos);
+    camera_pos_elem.innerText = vec_to_str(state.camera.pos);
   }
 
   state.mouse.old_pos = state.mouse.pos;
@@ -201,10 +258,16 @@ function step(state, timestamp_ms) {
   if (state.keys.rotate_left) {
     const to_rotate = model_rotate_speed * elapsed_s;
     mesh.model_to_world = mat4.rotateY(mat4.create(), mesh.model_to_world, to_rotate);
+
+    const mesh_pos = mat4.getTranslation(vec3.create(), mesh.model_to_world);
+    mesh_pos_elem.innerText = vec3.str(mesh_pos);
   }
   if (state.keys.rotate_right) {
     const to_rotate = model_rotate_speed * elapsed_s;
     mesh.model_to_world = mat4.rotateY(mat4.create(), mesh.model_to_world, -to_rotate);
+
+    const mesh_pos = mat4.getTranslation(vec3.create(), mesh.model_to_world);
+    mesh_pos_elem.innerText = vec3.str(mesh_pos);
   }
 
   let vertex_moved = false;
@@ -246,23 +309,29 @@ function step(state, timestamp_ms) {
   // console.debug("Render: timestamp: %i - %i = %i", timestamp, start_time, elapsed);
   draw_scene(state);
 
-  // NOTE: Draw html ui
-  // TODO: This happens every frame
-  const camera_pos_elem = document.getElementById("camera-pos");
-  const text = vec_to_str(state.camera.pos);
-  camera_pos_elem.innerText = text;
-  const camera_dir_elem = document.getElementById("camera-dir");
-  camera_dir_elem.innerText = vec_to_str(state.camera.dir);
-
-  const vertex_idx_elem = document.getElementById("vertex-idx");
-  vertex_idx_elem.innerText = state.selected_vertex_idx;
-  const mesh_pos_elem = document.getElementById("mesh-pos");
-  const mesh_pos = mat4.getTranslation(vec3.create(), mesh.model_to_world);
-  mesh_pos_elem.innerText = vec3.str(mesh_pos);
-
   state.frame_count += 1;
 
   requestAnimationFrame((t) => step(state, t));
+}
+
+function read_file(state, file) {
+  console.assert(file instanceof File);
+
+  const reader = new FileReader();
+
+  // TODO: Handle errors
+  reader.onload = () => {
+    const text = reader.result;
+
+    const mesh = parse_mesh_file(text);
+
+    if (mesh) {
+      state.mesh = mesh;
+      // TODO: Upload the new data to the GPU
+    }
+  };
+
+  reader.readAsText(file);
 }
 
 function main() {
@@ -477,6 +546,33 @@ function main() {
   document.onwheel = (event) => {
     console.debug("Mouse on wheel deltaY = %f", event.deltaY);
     state.camera.pos[2] += event.deltaY < 0 ? 1.0 : -1.0;
+  };
+
+  canvas.ondragover = (ev) => {
+    return false;
+  }
+  canvas.ondrop = (ev) => {
+    console.debug("On drop event: %o", ev);
+
+    ev.preventDefault();
+
+    if (ev.dataTransfer.items) {
+      const items = ev.dataTransfer.items;
+      console.debug("Drop items: %o", items);
+
+      [...items].forEach((item, i) => {
+        const file = item.getAsFile();
+        console.debug("Item[%i]: %o", i, file);
+        read_file(state, file);
+      })
+    } else {
+      const files = ev.dataTransfer.files;
+
+      console.debug("Drop files: %o", files);
+      [...files].forEach((file, i) => {
+        console.debug("File[%i]: %o", i, file);
+      })
+    }
   };
 
   canvas.onmousemove = (event) => {

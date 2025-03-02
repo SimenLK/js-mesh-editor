@@ -11,9 +11,10 @@ canvas {
 }
 
 .sidebar {
-  flex-basis: 400px;
+  flex-basis: 60ch;
   padding: 20px;
   border-right: 1px black solid;
+  max-width: 80ch;
 }
 
 .canvas-container {
@@ -24,6 +25,11 @@ canvas {
 
 .canvas-wrapper {
   display: flex;
+}
+
+.mesh-vertices {
+  max-height: 400px;
+  overflow-y: scroll;
 }
 
 .vertex-container {

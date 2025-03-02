@@ -46,7 +46,7 @@
     </header>
 
     <main>
-      <div class="sidebar">
+      <div id="sidebar" class="sidebar">
         <p>The purpose of this app is to test whether we can create a WebGL mesh editor. How will it be to interact with the mesh, modifying it with mouse-dragging, node deletion, and subsequent re-uploading of the mesh to the GPU.</p>
 
         <p>Currently, all that you can do is move the mesh model around. Or, you can move the camera. This is done in the "pan" mode. When you select "Select" mode, you can click on vertices, and the use the arrow keys to move the vertex around.</p>
@@ -105,8 +105,7 @@
               <code>Pos:</code>
               <code id="mesh-pos"></code>
             </div>
-            <div id="mesh-vertices">
-            </div>
+            <div id="mesh-vertices" class="mesh-vertices"></div>
           </div>
         </div>
       </div>
